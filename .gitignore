@@ -1,0 +1,16 @@
+node_modules/
+.expo/
+dist/
+web-build/
+*.tsbuildinfo
+.DS_Store
+hosts/expo/ios/
+hosts/expo/android/
+hosts/expo/dist/
+hosts/web/dist/
+test-results/
+playwright-report/
+e2e/screenshots/
+.verify-stamp
+# Darwin (macOS) visual snapshots - platform-specific, CI on Linux cannot reproduce
+*-snapshots/*-darwin.png

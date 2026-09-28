@@ -1,0 +1,11 @@
+#!/bin/sh
+
+repo_root=$(git rev-parse --show-toplevel) || exit 1
+guard="$repo_root/../__dev__/audits/tier-guard.sh"
+
+if [ ! -x "$guard" ]; then
+    echo "tier guard unavailable: $guard" >&2
+    exit 1
+fi
+
+exec "$guard" "$repo_root"
