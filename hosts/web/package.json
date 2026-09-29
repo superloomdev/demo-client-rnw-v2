@@ -1,0 +1,35 @@
+{
+  "name": "demo-client-rnw-v2-web",
+  "version": "1.0.0",
+  "author": {
+    "name": "sj00"
+  },
+  "contributors": [],
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 4173"
+  },
+  "dependencies": {
+    "@superloomdev/js-client-helper-font": "^1.0.0",
+    "@superloomdev/js-client-helper-themer": "^1.0.0",
+    "@superloomdev/js-client-helper-themer-ext-react": "^1.0.0",
+    "@superloomdev/js-client-helper-themer-template-carbon": "^1.0.0",
+    "@superloomdev/js-client-helper-themer-template-default": "^1.0.0",
+    "@superloomdev/js-client-helper-themer-template-material": "^1.0.0",
+    "@superloomdev/js-helper-debug": "^1.0.0",
+    "@superloomdev/js-helper-utils": "^1.0.0",
+    "@superloomdev/rnw-components": "file:../../../codebase-rnw-components-v2",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native-svg": "15.15.4",
+    "react-native-web": "~0.21.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^6.0.0"
+  }
+}

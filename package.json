@@ -1,0 +1,20 @@
+{
+  "name": "demo-client-rnw-v2",
+  "version": "1.0.0",
+  "type": "module",
+  "author": {
+    "name": "sj00"
+  },
+  "contributors": [],
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@superloomdev/js-helper-eslint-config": "^1.0.0",
+    "eslint": "^10.2.0"
+  }
+}
