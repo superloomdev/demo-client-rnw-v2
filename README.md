@@ -9,13 +9,15 @@ The proving ground for the generic Superloom React Native Web component library:
 | `src/app-core/` | The loader (the one place frameworks and helpers are imported), the Lib and theme contexts, config |
 | `src/themes/` | Building the component system from a built theme; brand layers |
 | `src/fonts/` | The font manifest over the host's font adapter |
-| `src/screens/` | Screens, shared by both hosts |
+| `src/screens/` | The showcase (index, one page per family) and the walker, shared by both hosts |
 | `src/_test/` | The Node test host |
+| `e2e/` | Playwright suites against the web build |
+| `scripts/` | `verify.js` (local CI parity), `ci-census.js`, `walk-server.js` |
 | `hosts/web/`, `hosts/expo/` | Host entries, bundler config and the two host adapters (Navigation, Fonts) |
 
 ## Selecting a theme
 
-Both hosts read `?profile=default|carbon|material`, `&scheme=<name>` (a scheme of that profile, first by default) and `&brand=<name>` (a key of `src/themes/brand-layers.js`).
+Both hosts read `?profile=default|carbon|material`, `&scheme=<name>` (a scheme of that profile, first by default) and `&brand=<name>` (a key of `src/themes/brand-layers.js`: `rounded`, `acme`).
 
 ## Commands
 

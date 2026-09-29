@@ -10,10 +10,16 @@
   "license": "MIT",
   "scripts": {
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
+    "lint:fix": "eslint . --fix",
+    "test:e2e": "npx playwright test",
+    "verify": "node scripts/verify.js",
+    "verify:fast": "node scripts/verify.js --fast",
+    "verify:gates": "node scripts/verify.js --gates",
+    "walk-server": "node scripts/walk-server.js"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.63.0",
     "@superloomdev/js-helper-eslint-config": "^1.0.0",
     "eslint": "^10.2.0"
   }

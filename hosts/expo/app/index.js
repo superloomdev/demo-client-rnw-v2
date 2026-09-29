@@ -1,4 +1,4 @@
-// Info: Index route - the bootstrap screen from shared source.
-import Home from '../../../src/screens/home/Home.js';
+// Info: Index route - the showcase index from shared source.
+import ShowcaseIndex from '../../../src/screens/showcase/ShowcaseIndex.js';
 
-export default Home;
+export default ShowcaseIndex;

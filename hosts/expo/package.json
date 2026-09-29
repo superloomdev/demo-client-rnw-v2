@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@expo-google-fonts/ibm-plex-sans": "^0.4.1",
+    "@expo-google-fonts/roboto": "^0.4.3",
     "@superloomdev/js-client-helper-font": "^1.0.0",
     "@superloomdev/js-client-helper-font-ext-expo": "^1.0.0",
     "@superloomdev/js-client-helper-themer": "^1.0.0",

@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Info: Pre-push gate for `main`. Refuses a push that updates refs/heads/main
+# unless a full `npm run verify` has run since the last content change. The
+# stamp is content-based: any edit after verify leaves it stale. Pushes that
+# touch only other branches (`wip/*`) pass through untouched.
+set -uo pipefail
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+STAMP="$REPO_ROOT/.verify-stamp"
+
+TARGETS_MAIN=0
+while read -r local_ref local_sha remote_ref remote_sha; do
+  if [ "$remote_ref" = "refs/heads/main" ]; then
+    TARGETS_MAIN=1
+  fi
+done
+
+if [ "$TARGETS_MAIN" -eq 0 ]; then
+  exit 0
+fi
+
+if [ ! -f "$STAMP" ]; then
+  echo "pre-push: .verify-stamp missing. Run npm run verify before pushing to main."
+  exit 1
+fi
+
+STAMPED_HASH="$(awk '{print $1}' "$STAMP")"
+CURRENT_HASH="$(bash "$REPO_ROOT/scripts/content-hash.sh")"
+
+if [ "$STAMPED_HASH" != "$CURRENT_HASH" ]; then
+  echo "pre-push: .verify-stamp is stale. Run npm run verify before pushing to main."
+  echo "  stamped: $STAMPED_HASH"
+  echo "  current: $CURRENT_HASH"
+  exit 1
+fi
+
+echo "pre-push: verify stamp is current ($CURRENT_HASH)"
+exit 0

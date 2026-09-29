@@ -1,8 +1,9 @@
 // Info: Test host for the app core. Builds Lib through the real loader with
 // stub adapters (the test tier is a host, never a second composition root),
-// then proves every profile and scheme builds a component system, the brand
-// layer reaches the tokens, fonts the host lacks fall back to System and are
-// reported, and the bootstrap screen renders a library component.
+// then proves every profile and scheme builds a component system, both brand
+// layers reach the tokens, fonts the host lacks fall back to System and are
+// reported, the showcase renders every catalog state, and the walker report
+// has the shape the native gate reads.
 
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,7 +13,10 @@ import TestRenderer, { act } from 'react-test-renderer';
 import appLoader from '../app-core/loader.js';
 import { LibProvider } from '../app-core/contexts/lib-context.js';
 import { buildSystem, THEME_PLATFORM } from '../themes/build-system.js';
-import Home from '../screens/home/Home.js';
+import ShowcaseIndex from '../screens/showcase/ShowcaseIndex.js';
+import FamilyPage from '../screens/showcase/FamilyPage.js';
+import { getFamilies, getHref } from '../screens/showcase/catalog.js';
+import { buildReport } from '../screens/walk/report.js';
 import navigationAdapter from './adapters/navigation.js';
 import fontsAdapter from './adapters/fonts.js';
 
@@ -104,49 +108,139 @@ describe('build-system: every profile and scheme', function () {
 });
 
 
-describe('Home under the theme provider', function () {
+/********************************************************************
+Render an element inside the Lib and theme providers.
+
+@param {Object} element - Screen element
+@param {Object} theme   - { profile, scheme, brand }
+
+@return {Promise<Object>} - The test renderer
+*********************************************************************/
+async function renderThemed (element, theme) {
+
+  let renderer;
+  await act(async function () {
+    renderer = TestRenderer.create(
+      React.createElement(LibProvider, { adapters: ADAPTERS },
+        React.createElement(function App () {
+          const { ThemeProvider } = Lib.ThemeContext;
+          return React.createElement(ThemeProvider, theme, element);
+        }))
+    );
+  });
+
+  return renderer;
+
+}
+
+
+describe('showcase', function () {
+
+  test('the catalog groups into families in roster order', function () {
+    const families = getFamilies(Lib.Components.catalog);
+    assert.ok(families.length >= 1);
+    assert.equal(families.reduce(function (sum, group) {
+      return sum + group.components.length;
+    }, 0), Lib.Components.catalog.length);
+    assert.deepEqual(Lib.Components.catalog.map(function (entry) {
+      return entry.name;
+    }).sort(), Object.keys(Lib.Components.factories).sort());
+  });
+
+  test('links carry profile, scheme and brand', function () {
+    assert.equal(getHref('/showcase/Icon', { profileName: 'carbon', schemeName: 'g10', brandName: 'acme' }), '/showcase/Icon?profile=carbon&scheme=g10&brand=acme');
+    assert.equal(getHref('/walk', { profileName: 'default', schemeName: 'light', brandName: null }), '/walk?profile=default&scheme=light');
+  });
 
   for (const profileName of ['default', 'carbon', 'material']) {
-    test(profileName + ': renders the profile, the component count and an icon', async function () {
-      let renderer;
-      await act(async function () {
-        renderer = TestRenderer.create(
-          React.createElement(LibProvider, { adapters: ADAPTERS },
-            React.createElement(function App () {
-              const { ThemeProvider } = Lib.ThemeContext;
-              return React.createElement(ThemeProvider, { profile: profileName }, React.createElement(Home));
-            }))
-        );
-      });
+    test(profileName + ': the index names the selection and every family', async function () {
+      const renderer = await renderThemed(React.createElement(ShowcaseIndex), { profile: profileName });
       const lines = texts(renderer.toJSON());
       const scheme = Object.keys(Lib.Themes.profiles[profileName].schemes)[0];
-      assert.ok(lines.includes('Profile: ' + profileName + ' / ' + scheme), lines.join(' | '));
-      assert.ok(lines.includes('Components: ' + Object.keys(Lib.Components.factories).length), lines.join(' | '));
-      const svg = renderer.root.findAll(function (node) {
-        return node.type === 'svg';
-      });
-      assert.equal(svg.length, 1);
-      assert.ok(svg[0].findAll(function (node) {
-        return node.type === 'path' && typeof node.props.d === 'string' && node.props.d.length > 0;
-      }).length >= 1);
+      assert.ok(lines.includes(profileName + ' / ' + scheme), lines.join(' | '));
+      for (const group of getFamilies(Lib.Components.catalog)) {
+        assert.ok(lines.includes(group.family + ' (' + group.components.length + ')'), group.family);
+      }
       await act(async function () {
         renderer.unmount();
       });
+    });
+
+    test(profileName + ': every family page renders one error-free cell per sample state', async function () {
+      for (const group of getFamilies(Lib.Components.catalog)) {
+        const renderer = await renderThemed(React.createElement(FamilyPage, { family: group.family }), { profile: profileName });
+        const expected = group.components.reduce(function (sum, entry) {
+          return sum + entry.sample.length;
+        }, 0);
+        const ids = new Set(renderer.root.findAll(function (node) {
+          return typeof node.type === 'string' && node.props['data-cell'] === 'true';
+        }).map(function (node) {
+          return node.props['data-component'] + '/' + node.props['data-state'];
+        }));
+        assert.equal(ids.size, expected, group.family + ' cell count');
+        assert.equal(renderer.root.findAll(function (node) {
+          return typeof node.type === 'string' && node.props['data-testid'] === 'cell-error';
+        }).length, 0, group.family + ' has a failing cell');
+        await act(async function () {
+          renderer.unmount();
+        });
+      }
     });
   }
 
   test('an unknown profile is a programmer error', async function () {
     await assert.rejects(async function () {
-      await act(async function () {
-        TestRenderer.create(
-          React.createElement(LibProvider, { adapters: ADAPTERS },
-            React.createElement(function App () {
-              const { ThemeProvider } = Lib.ThemeContext;
-              return React.createElement(ThemeProvider, { profile: 'nope' }, React.createElement(Home));
-            }))
-        );
-      });
+      await renderThemed(React.createElement(ShowcaseIndex), { profile: 'nope' });
     }, /unknown profile "nope"/);
+  });
+
+});
+
+
+describe('acme brand', function () {
+
+  for (const profileName of ['default', 'carbon', 'material']) {
+    test(profileName + ' + acme: color, family, radii and three glyphs reach the built theme', function () {
+      const profile = Lib.Themes.profiles[profileName];
+      const template = profile.schemes[Object.keys(profile.schemes)[0]];
+      const acme = Lib.Themes.brands.acme.tokens;
+      const built = Lib.Themer.buildTheme(template, [Lib.Themes.brands.acme], THEME_PLATFORM);
+      for (const name of ['color.interactive', 'color.focus', 'font.family.sans', 'shape.radius_04', 'shape.radius_08']) {
+        assert.equal(built.tokens[name], acme[name], name);
+      }
+      for (const name of ['icon.close', 'icon.checkmark', 'icon.search']) {
+        assert.deepEqual(built.tokens[name], acme[name], name);
+      }
+      const result = buildSystem(Lib, built, null, 'md');
+      assert.equal(Object.keys(result.Registry).length, Object.keys(Lib.Components.factories).length);
+    });
+  }
+
+});
+
+
+describe('walker report', function () {
+
+  test('carries every field the native gate reads, with fonts named and drawn', function () {
+    const built = Lib.Themer.buildTheme(Lib.Themes.profiles.material.schemes.light, [Lib.Themes.brands.acme], THEME_PLATFORM);
+    const result = buildSystem(Lib, built, null, 'md');
+    const ctx = { built: built, theme: result.tokens, profileName: 'material', schemeName: 'light', brandName: 'acme' };
+    const report = buildReport({
+      ctx: ctx,
+      platform: 'ios',
+      catalog: Lib.Components.catalog,
+      cells: [{ component: 'Icon', state: 'default', width: 20, height: 20 }],
+      errors: []
+    });
+    assert.deepEqual(Object.keys(report).sort(), ['brand', 'cells', 'components', 'errors', 'expectedCells', 'family', 'fonts', 'platform', 'schema', 'scheme', 'theme', 'tokens']);
+    assert.equal(report.expectedCells, Lib.Components.catalog.reduce(function (sum, entry) {
+      return sum + entry.sample.length;
+    }, 0));
+    assert.equal(report.tokens['color.interactive'], Lib.Themes.brands.acme.tokens['color.interactive']);
+    const sans = report.fonts.find(function (font) {
+      return font.role === 'font.family.sans';
+    });
+    assert.deepEqual(sans, { role: 'font.family.sans', family: 'Roboto', drawn: 'System', loaded: false });
   });
 
 });

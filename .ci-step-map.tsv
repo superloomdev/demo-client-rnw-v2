@@ -1,0 +1,9 @@
+match_field	pattern	local_gate	note
+name	G[0-9]+.*	gates	Every enforcement grep is extracted from ci.yml and replayed verbatim.
+name	Install and lint	clean install,eslint	
+name	Install and test	clean install,unit tests (src/_test)	
+name	Install and build web host	clean install,web build	
+name	Install root deps	clean install	
+name	Install Playwright browsers	e2e	
+name	Run E2E	e2e	
+name	Expo web export	clean install,expo web export	

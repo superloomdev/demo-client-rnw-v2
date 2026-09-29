@@ -14,6 +14,7 @@ import jsClientHelperThemerExtReact from '@superloomdev/js-client-helper-themer-
 import jsClientHelperFont from '@superloomdev/js-client-helper-font';
 import { createSystem } from '@superloomdev/rnw-components';
 import * as factories from '@superloomdev/rnw-components/all';
+import { catalog } from '@superloomdev/rnw-components/catalog';
 import defaultProfile from '@superloomdev/js-client-helper-themer-template-default';
 import carbonProfile from '@superloomdev/js-client-helper-themer-template-carbon';
 import materialProfile from '@superloomdev/js-client-helper-themer-template-material';
@@ -94,10 +95,12 @@ export default function loader (adapters) {
     brands: BRAND_LAYERS
   };
 
-  // The component library: its one entry point and every factory it exports
+  // The component library: its one entry point, every factory it exports,
+  // and the catalog (family, tier, platform, flags, sample states per component)
   Lib.Components = {
     createSystem: createSystem,
-    factories: factories
+    factories: factories,
+    catalog: catalog
   };
 
   // Theming hub (provider + hooks); needs Themes, Fonts, Components

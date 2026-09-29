@@ -4,8 +4,13 @@
 
 From the repo root:
 
+- `npm run verify` - **run this before every push to `main`.** Every CI step in CI order: the enforcement greps replayed from `ci.yml`, clean installs of root, `src/_test`, `hosts/web`, `hosts/expo`, eslint, the Node test host, the web build, the Expo web export and the Playwright e2e suite, then the parity assertion that every mapped step executed and the `.verify-stamp` the pre-push hook checks
+- `npm run verify:fast` - the same without e2e; never writes the stamp
+- `npm run verify:gates` - the enforcement greps only
 - `npm run lint` - eslint .
 - `npm run lint:fix` - eslint . --fix
+- `npm run test:e2e` - Playwright over `vite preview` (build `hosts/web` first) plus the walk server: readiness, structural, accessibility identity across profiles, `acme` brand reach, the walker end to end, per-family screenshots in `test-results/showcase/`
+- `npm run walk-server -- --port 8787 --out test-results/walk` - receives walker reports (`POST /report`)
 
 From `src/_test/`:
 
@@ -13,11 +18,12 @@ From `src/_test/`:
 
 From `hosts/web/`:
 
-- `npm run build` - Vite web build; `npx vite preview --port 4173` serves it (`?profile=default|carbon|material&scheme=<s>&brand=<b>`)
+- `npm run build` - Vite web build; `npx vite preview --port 4173` serves it. Routes: `/` showcase index, `/showcase/<Family>`, `/walk[/<Family>]?report=<url>`; query `?profile=` (or `?theme=`) `default|carbon|material`, `&scheme=<s>`, `&brand=rounded|acme`
 
 From `hosts/expo/`:
 
-- `npx expo export --platform web` - Metro web export (same selection through the URL)
+- `npx expo export --platform web` - Metro web export (same routes and selection)
+- Native walker by deep link: `nimbus://walk?theme=<t>&report=<url>`, one family `nimbus://walk/<Family>?theme=<t>`
 
 Always delete `node_modules` and `package-lock.json` before testing. Consumer repos install from the GitHub Packages registry; stale installs mask breakage.
 
@@ -31,6 +37,10 @@ Bundler requirements this imposes, both hosts:
 - `@react-native/assets-registry/registry` resolves to `react-native-web/dist/modules/AssetRegistry/index.js` (react-native-svg's web build imports it).
 - `node:module` resolves to the host's `node-module-stub.js` (helper-utils imports `createRequire` for Node-only JSON loading).
 - The library's real path (the sibling repo) is watched by Metro and allowed by the Vite dev server.
+
+## Hooks
+
+`git config core.hooksPath .githooks` is set in this clone. `pre-commit` runs the workspace tier guard; `pre-push` refuses a push to `main` unless `.verify-stamp` matches the current content (a full `npm run verify` since the last edit). Pushes to `wip/*` are not gated.
 
 ## Conventional Commits
 

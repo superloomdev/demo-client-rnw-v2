@@ -1,0 +1,180 @@
+# CI Pipeline: demo client (web + Expo) on the generic component library
+#
+# The component library is file:-linked from its sibling repository until it
+# is published, so every job that installs checks out both repositories side
+# by side, exactly as they sit in the workspace:
+#   codebase-demo-client-rnw-v2/   (this repository)
+#   codebase-rnw-components-v2/    (the library)
+# `scripts/verify.js` replays the enforcement greps locally and runs a named
+# local counterpart for every other step (`.ci-step-map.tsv`).
+# The native simulator gate is a separate workflow (native-gate.yml).
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+
+  enforcement:
+    name: Enforcement Greps
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: G1 - Prose mechanics (no British spelling, no em dash)
+        run: |
+          hits=$(git grep -niE "colour|behaviour|recognis|initialis|optimise|optimisation|authoris|prioritis" -- . ':(exclude).github/*' ':(exclude)*package-lock.json' ':(exclude)*.txt' || true)
+          if [ -n "$hits" ]; then
+            echo "FAIL: British spelling found. Use American English."
+            echo "$hits"
+            exit 1
+          fi
+          em=$(git grep -n "—" -- . ':(exclude).github/*' ':(exclude)*package-lock.json' ':(exclude)*.txt' || true)
+          if [ -n "$em" ]; then
+            echo "FAIL: em dash found. Use a comma, a period, or ' - ' instead."
+            echo "$em"
+            exit 1
+          fi
+          echo "PASS: no British spelling or em dash in tracked files"
+      - name: G2 - No host icon adapter and no icon-font dependency
+        run: |
+          hits=$(git ls-files | grep -E "adapters/icons|adapters/icon-paths" || true)
+          deps=$(git grep -nE "@expo/vector-icons|@carbon/icons|ionicons|react-native-vector-icons" -- '*package.json' || true)
+          if [ -n "$hits$deps" ]; then
+            echo "FAIL: icons are theme tokens drawn by the component library; a host icon adapter or icon font is a second icon source."
+            echo "$hits"
+            echo "$deps"
+            exit 1
+          fi
+          echo "PASS: no host icon source"
+      - name: G3 - Peer-dep utilization in app source (Lib.Utils primitives, not raw checks)
+        run: |
+          hits=$(git grep -nE "\.length (===|!==|>) 0|(===|!==) ''|Object\.keys\([^)]+\)\.length (===|!==|>) 0" -- 'src/*.js' 'hosts/*.js' 'hosts/*.jsx' ':(exclude)src/_test/*' ':(exclude)src/app-core/loader.validators.js' || true)
+          if [ -n "$hits" ]; then
+            echo "FAIL: raw length or keys check found. Use Lib.Utils.isEmptyArray, isEmptyObject, or isEmptyString."
+            echo "$hits"
+            exit 1
+          fi
+          echo "PASS: no raw emptiness checks in app source"
+      - name: G4 - src/_test references no host install (CI installs src/_test alone)
+        run: |
+          hits=$(git grep -nE "hosts/" -- 'src/_test/*' || true)
+          if [ -n "$hits" ]; then
+            echo "FAIL: a src/_test file references a host install."
+            echo "$hits"
+            exit 1
+          fi
+          echo "PASS: src/_test is self-contained"
+      - name: G5 - CI step map covers every workflow step
+        run: |
+          node scripts/ci-census.js --check-map
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          registry-url: 'https://npm.pkg.github.com'
+      - name: Install and lint
+        run: |
+          npm ci
+          npm run lint
+
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: codebase-demo-client-rnw-v2
+      - uses: actions/checkout@v7
+        with:
+          repository: superloomdev/rnw-components-v2
+          path: codebase-rnw-components-v2
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          registry-url: 'https://npm.pkg.github.com'
+      - name: Install and test
+        working-directory: codebase-demo-client-rnw-v2/src/_test
+        run: |
+          npm ci
+          npm test
+
+  web:
+    name: Web Build and E2E
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: codebase-demo-client-rnw-v2
+      - uses: actions/checkout@v7
+        with:
+          repository: superloomdev/rnw-components-v2
+          path: codebase-rnw-components-v2
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          registry-url: 'https://npm.pkg.github.com'
+      - name: Install and build web host
+        working-directory: codebase-demo-client-rnw-v2/hosts/web
+        run: |
+          npm ci
+          npx vite build
+      - name: Install root deps
+        working-directory: codebase-demo-client-rnw-v2
+        run: npm ci
+      - name: Install Playwright browsers
+        working-directory: codebase-demo-client-rnw-v2
+        run: npx playwright install --with-deps chromium
+      - name: Run E2E
+        working-directory: codebase-demo-client-rnw-v2
+        run: npx playwright test
+      - name: Upload E2E results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-results
+          path: codebase-demo-client-rnw-v2/test-results/
+          retention-days: 7
+
+  expo-web:
+    name: Expo Web Export
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: codebase-demo-client-rnw-v2
+      - uses: actions/checkout@v7
+        with:
+          repository: superloomdev/rnw-components-v2
+          path: codebase-rnw-components-v2
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          registry-url: 'https://npm.pkg.github.com'
+      - name: Expo web export
+        working-directory: codebase-demo-client-rnw-v2/hosts/expo
+        run: |
+          npm ci
+          npx expo export --platform web --output-dir dist

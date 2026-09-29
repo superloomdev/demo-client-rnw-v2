@@ -14,3 +14,4 @@ e2e/screenshots/
 .verify-stamp
 # Darwin (macOS) visual snapshots - platform-specific, CI on Linux cannot reproduce
 *-snapshots/*-darwin.png
+

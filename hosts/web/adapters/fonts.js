@@ -1,37 +1,37 @@
-// Info: Web adapter for the Fonts slot.
-// System-only: no platform font loader, empty manifest.
-// The harness proves portability, not font rendering.
+// Info: Web adapter for the Fonts slot. The web host has no native font
+// loader: `index.html` declares its families with @font-face from
+// public/fonts (IBM Plex Sans and Roboto, both SIL OFL 1.1, licenses beside
+// the files), so the manifest stays empty and the adapter answers per family
+// from that declared list. A family the page does not declare is reported
+// as not loaded, so the system builder draws it in System and says so,
+// instead of letting the browser substitute a default face silently.
+
+// Families index.html declares; keep in step with its @font-face rules
+const DECLARED_FAMILIES = ['IBM Plex Sans', 'Roboto'];
 
 
 export default function (Lib, config) { // eslint-disable-line no-unused-vars
 
-  // Minimal no-op font adapter satisfying the font extension contract
+  // Font extension contract over the declared list
   const adapter = {
     loadManifest: function () {
+      // Return success: there is nothing to load beyond what CSS declares
       return Promise.resolve({ success: true, error: null });
     },
     isReady: function () {
-      // Return true: the web host declares its fonts through CSS, so there is
-      // no asynchronous load for this adapter to be waiting on
+      // Return true: CSS font loading never blocks the first render
       return true;
     },
-    isFamilyLoaded: function () {
-      // Return true for every family: the web host resolves families through
-      // CSS @font-face, which this adapter cannot inspect, so it cannot report
-      // a per-family answer and must not block the caller
-      return true;
+    isFamilyLoaded: function (family) {
+      // Return whether the page declares this family
+      return Lib.Utils.inArray(DECLARED_FAMILIES, family);
     }
   };
 
-  // IBM Plex Sans is loaded via @font-face in index.html (Google Fonts CDN).
-  // The web adapter has no native font loader, so the manifest stays empty.
-  // The @font-face declaration makes the family available to CSS directly;
-  // the font system's isFamilyLoaded returns true for all families on web.
-  const manifest = {};
-
+  // Return the adapter with an empty manifest
   return {
     adapter: adapter,
-    manifest: manifest
+    manifest: {}
   };
 
 };

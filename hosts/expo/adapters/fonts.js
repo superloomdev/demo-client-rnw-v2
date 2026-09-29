@@ -8,6 +8,11 @@ import {
   IBMPlexSans_600SemiBold,
   IBMPlexSans_700Bold
 } from '@expo-google-fonts/ibm-plex-sans';
+import {
+  Roboto_400Regular,
+  Roboto_500Medium,
+  Roboto_700Bold
+} from '@expo-google-fonts/roboto';
 
 
 export default function (Lib, config) { // eslint-disable-line no-unused-vars
@@ -31,6 +36,25 @@ export default function (Lib, config) { // eslint-disable-line no-unused-vars
         },
         bold: {
           asset: IBMPlexSans_700Bold,
+          weight: '700',
+          style: 'normal'
+        }
+      }
+    },
+    'Roboto': {
+      styles: {
+        normal: {
+          asset: Roboto_400Regular,
+          weight: '400',
+          style: 'normal'
+        },
+        medium: {
+          asset: Roboto_500Medium,
+          weight: '500',
+          style: 'normal'
+        },
+        bold: {
+          asset: Roboto_700Bold,
           weight: '700',
           style: 'normal'
         }

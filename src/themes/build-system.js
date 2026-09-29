@@ -1,7 +1,7 @@
 // Info: System builder for the demo application. Resolves every theme font
-// role against the fonts the host has registered, falls back to System for a
-// family the host does not carry (and asks the host to load it once), then
-// builds the component system through the library's one entry point.
+// role against the fonts the host carries, falls back to System for a family
+// it does not (and asks the host to load it once), then builds the component
+// system through the library's one entry point.
 //
 // The built theme is never mutated: the engine may hand back a cached
 // object, so the font fallback writes into a copy of the token map.
@@ -42,9 +42,11 @@ export function buildSystem (Lib, built, rederive, breakpoint) {
   });
   for (const role of roles) {
 
-    // A registered family, or System, is used as the theme names it
+    // System, a family registered through the host manifest (native), or one
+    // the host's adapter reports loaded by its own mechanism (web CSS) is
+    // used as the theme names it
     const family = tokens[role];
-    if (family === 'System' || Lib.Font.isRegistered(family)) {
+    if (family === 'System' || Lib.Font.isRegistered(family) || Lib.FontAdapter.isFamilyLoaded(family)) {
       continue;
     }
 

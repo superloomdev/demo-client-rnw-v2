@@ -6,7 +6,8 @@
 
 /********************************************************************
 Fonts adapter factory. Returns the Fonts contract with stub methods
-that always report success and readiness (no real font loading in tests).
+that report success and readiness but no loaded family (the test host
+carries no font).
 
 @param {Object} Lib    - Lib container (unused in stub)
 @param {Object} config - Config (unused in stub)
@@ -26,7 +27,9 @@ export default function (Lib, config) { // eslint-disable-line no-unused-vars
       return true;
     },
     isFamilyLoaded: function () {
-      return true;
+      // Return false: the test host carries no font, so every named family
+      // exercises the System fallback and its report
+      return false;
     }
   };
 
