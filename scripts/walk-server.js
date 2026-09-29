@@ -1,8 +1,12 @@
-// Info: Receives walker reports. `POST /report` writes the JSON body to
-// `<out>/<platform>-<theme>[-<family>].json` and answers 200 with the file name; `GET /health`
-// answers 200; `GET /reports` lists what was received. CORS is open so the
-// web walker (a different origin) can post. Used by the native gate on CI
-// and by the web e2e walker test.
+// Info: Receives walker reports and holds the current walk command.
+// `POST /report` writes the JSON body to `<out>/<platform>-<theme>[-<family>].json`
+// and answers 200 with the file name; `GET /health` answers 200; `GET /reports`
+// lists what was received. `POST /command` stores `{ theme, family }` (or
+// `null`) and `GET /command` returns it: an app in autopilot mode polls it
+// instead of receiving a deep link (iOS confirms custom-scheme links with a
+// dialog no simulator command can tap). CORS is open so the web walker (a
+// different origin) can post. Used by the native gate on CI and by the web
+// e2e walker test.
 //
 // Usage: node scripts/walk-server.js [--port 8787] [--out test-results/walk]
 
@@ -17,6 +21,7 @@ const arg = function (flag, fallback) {
 const PORT = Number(arg('--port', '8787'));
 const OUT = resolve(arg('--out', 'test-results/walk'));
 const received = [];
+let command = null;
 
 mkdirSync(OUT, { recursive: true });
 
@@ -47,6 +52,32 @@ const server = createServer(function (req, res) {
   if (req.method === 'GET' && path === '/reports') {
     res.writeHead(200, Object.assign({ 'content-type': 'application/json' }, CORS));
     res.end(JSON.stringify(received));
+    return;
+  }
+
+  // The current command
+  if (req.method === 'GET' && path === '/command') {
+    res.writeHead(200, Object.assign({ 'content-type': 'application/json' }, CORS));
+    res.end(JSON.stringify(command));
+    return;
+  }
+  if (req.method === 'POST' && path === '/command') {
+    let body = '';
+    req.on('data', function (chunk) {
+      body += chunk;
+    });
+    req.on('end', function () {
+      try {
+        command = JSON.parse(body);
+      } catch {
+        res.writeHead(400, CORS);
+        res.end('body is not JSON');
+        return;
+      }
+      process.stdout.write('walk-server: command ' + JSON.stringify(command) + '\n');
+      res.writeHead(200, Object.assign({ 'content-type': 'application/json' }, CORS));
+      res.end(JSON.stringify(command));
+    });
     return;
   }
 

@@ -7,6 +7,12 @@ import { Stack, useGlobalSearchParams } from 'expo-router';
 import { LibProvider, useLib } from '../../../src/app-core/contexts/lib-context.js';
 import navigationAdapter from '../adapters/navigation.js';
 import fontsAdapter from '../adapters/fonts.js';
+import Autopilot from '../../../src/screens/walk/Autopilot.js';
+
+// Build-time flag (Expo inlines EXPO_PUBLIC_* at bundle time): when the
+// native gate builds with EXPO_PUBLIC_WALK_SERVER set, the app boots into the
+// autopilot instead of the router and takes its walk commands from that server
+const WALK_SERVER = process.env.EXPO_PUBLIC_WALK_SERVER || null;
 
 // Stable adapter set: LibProvider memoizes the container on this reference
 const ADAPTERS = { Navigation: navigationAdapter, Fonts: fontsAdapter };
@@ -39,6 +45,11 @@ function Boot () {
   // Block render until every registered font family has loaded
   if (!fontsReady) {
     return null;
+  }
+
+  // A gate build walks under the server's command; nothing else renders
+  if (WALK_SERVER) {
+    return <Autopilot server={WALK_SERVER} />;
   }
 
   // Provide the selected theme to every route

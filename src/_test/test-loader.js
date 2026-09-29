@@ -18,6 +18,12 @@ import FamilyPage from '../screens/showcase/FamilyPage.js';
 import { getFamilies, getHref } from '../screens/showcase/catalog.js';
 import { buildReport } from '../screens/walk/report.js';
 import Walker from '../screens/walk/Walker.js';
+import Autopilot from '../screens/walk/Autopilot.js';
+import { spawn } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import navigationAdapter from './adapters/navigation.js';
 import fontsAdapter from './adapters/fonts.js';
 
@@ -302,6 +308,129 @@ describe('walker', function () {
     await act(async function () {
       renderer.unmount();
     });
+  });
+
+});
+
+
+describe('autopilot', function () {
+
+  test('takes each command from the server, walks under that theme and posts the report', async function () {
+    const expected = Lib.Components.catalog.reduce(function (sum, entry) {
+      return sum + entry.sample.length;
+    }, 0);
+
+    // Stub the server: GET /command answers the current command, POST /report records
+    let command = null;
+    const reports = [];
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = async function (url, options) {
+      if (url === 'http://stub/command') {
+        return { ok: true, json: async function () {
+          return command;
+        } };
+      }
+      if (url === 'http://stub/report') {
+        reports.push(JSON.parse(options.body));
+        return { ok: true, text: async function () {
+          return '';
+        } };
+      }
+      throw new Error('unexpected fetch ' + url);
+    };
+
+    // Unmount in `finally`: the autopilot's poll timer would otherwise keep a
+    // failed run alive
+    let renderer;
+    try {
+      await act(async function () {
+        renderer = TestRenderer.create(React.createElement(LibProvider, { adapters: ADAPTERS },
+          React.createElement(Autopilot, { server: 'http://stub', pollMs: 20 })));
+      });
+      assert.ok(texts(renderer.toJSON()).some(function (line) {
+        return line.indexOf('autopilot: waiting') === 0;
+      }));
+
+      for (const next of [{ theme: 'carbon', family: null }, { theme: 'material', family: 'Icon' }]) {
+        command = next;
+        await act(async function () {
+          await new Promise(function (done) {
+            setTimeout(done, 80);
+          });
+        });
+        assert.ok(texts(renderer.toJSON()).some(function (line) {
+          return line.indexOf('autopilot: ' + next.theme + ' / ' + (next.family || 'all')) === 0;
+        }), texts(renderer.toJSON()).join(' | '));
+        const bodies = renderer.root.findAll(function (node) {
+          return typeof node.props.testID === 'string' && node.props.testID.indexOf('body-') === 0 && typeof node.props.onLayout === 'function';
+        }).filter(function (node, index, all) {
+          return all.findIndex(function (other) {
+            return other.props.testID === node.props.testID;
+          }) === index;
+        });
+        assert.equal(bodies.length, expected, next.theme + ': cells');
+        await act(async function () {
+          for (const body of bodies) {
+            body.props.onLayout({ nativeEvent: { layout: { width: 20, height: 20 } } });
+          }
+          await new Promise(function (done) {
+            setTimeout(done, 20);
+          });
+        });
+        const report = reports[reports.length - 1];
+        assert.ok(report, next.theme + ': no report posted');
+        assert.equal(report.theme, next.theme);
+        assert.equal(report.family, next.family);
+        assert.equal(report.cells.length, expected);
+      }
+      assert.equal(reports.length, 2);
+    } finally {
+      await act(async function () {
+        renderer.unmount();
+      });
+      globalThis.fetch = realFetch;
+    }
+  });
+
+});
+
+
+describe('walk-server', function () {
+
+  test('holds the command and writes each report under platform-theme[-family].json', async function () {
+    const out = mkdtempSync(join(tmpdir(), 'walk-'));
+    const script = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'scripts', 'walk-server.js');
+    const server = spawn('node', [script, '--port', '8797', '--out', out], { stdio: 'ignore' });
+    try {
+      let up = false;
+      for (let i = 0; i < 50 && !up; i++) {
+        up = await fetch('http://localhost:8797/health').then(function (response) {
+          return response.ok;
+        }).catch(function () {
+          return false;
+        });
+        if (!up) {
+          await new Promise(function (done) {
+            setTimeout(done, 100);
+          });
+        }
+      }
+      assert.ok(up, 'walk-server did not start');
+
+      assert.equal(await (await fetch('http://localhost:8797/command')).json(), null);
+      await fetch('http://localhost:8797/command', { method: 'POST', body: JSON.stringify({ theme: 'carbon', family: 'Icon' }) });
+      assert.deepEqual(await (await fetch('http://localhost:8797/command')).json(), { theme: 'carbon', family: 'Icon' });
+
+      const posted = await fetch('http://localhost:8797/report', { method: 'POST', headers: { 'content-type': 'text/plain' }, body: JSON.stringify({ platform: 'ios', theme: 'carbon', family: 'Icon', cells: [] }) });
+      assert.equal(posted.status, 200);
+      assert.deepEqual(await posted.json(), { received: 'ios-carbon-Icon.json' });
+      assert.ok(existsSync(join(out, 'ios-carbon-Icon.json')));
+      assert.equal(JSON.parse(readFileSync(join(out, 'ios-carbon-Icon.json'), 'utf8')).theme, 'carbon');
+      assert.equal((await fetch('http://localhost:8797/report', { method: 'POST', body: 'not json' })).status, 400);
+    } finally {
+      server.kill();
+      rmSync(out, { recursive: true, force: true });
+    }
   });
 
 });

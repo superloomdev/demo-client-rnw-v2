@@ -1,17 +1,21 @@
 // Info: Drives the walker on a booted simulator or emulator for the native
-// gate. For each template it opens the walker by deep link with the walk
-// server's report URL, waits for the report file, then opens the walker once
-// per family and takes a screenshot. The walk server must already be running
-// and writing to `--out`.
+// gate. For each template it starts a walk, waits for the report file, then
+// walks once per family and takes a screenshot. The walk server must already
+// be running and writing to `--out`. Two ways to steer the app:
+//
+//   --mode link (default)  deep links: nimbus://walk?theme=..&report=.. from a
+//                          stopped app (cold), then nimbus://walk/<Family>
+//                          into the running app (warm). Android.
+//   --mode command         the app was built with EXPO_PUBLIC_WALK_SERVER and
+//                          polls the server's /command; this driver launches
+//                          the app once and posts each command. iOS, where a
+//                          custom-scheme link opened from outside stops at a
+//                          system dialog no simulator command can tap.
 //
 // Usage: node scripts/native-walk.js --platform ios|android --out <dir>
-//          [--report-host localhost|10.0.2.2] [--port 8787]
-//          [--themes default,carbon,material] [--timeout 180]
+//          [--mode link|command] [--report-host localhost|10.0.2.2]
+//          [--port 8787] [--themes default,carbon,material] [--timeout 180]
 //          [--app-id com.anonymous.nimbusrnwdemo]
-//
-// Each template's walk starts from a stopped app, so the link cold-starts
-// it; the per-family links then reach the running app (warm), which is the
-// path a user's deep link takes most of the time. Both must work.
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, writeFileSync } from 'node:fs';
@@ -30,6 +34,12 @@ const HOST = arg('--report-host', PLATFORM === 'android' ? '10.0.2.2' : 'localho
 const THEMES = arg('--themes', 'default,carbon,material').split(',');
 const TIMEOUT_S = Number(arg('--timeout', '180'));
 const APP_ID = arg('--app-id', 'com.anonymous.nimbusrnwdemo');
+const MODE = arg('--mode', 'link');
+
+if (MODE !== 'link' && MODE !== 'command') {
+  process.stderr.write('native-walk: --mode must be link or command\n');
+  process.exit(2);
+}
 
 if (PLATFORM !== 'ios' && PLATFORM !== 'android') {
   process.stderr.write('native-walk: --platform must be ios or android\n');
@@ -84,6 +94,67 @@ function stopApp () {
 
 
 /********************************************************************
+Launch the app plainly (no URL), for command mode.
+
+@return {undefined}
+*********************************************************************/
+function launchApp () {
+
+  if (PLATFORM === 'ios') {
+    execFileSync('xcrun', ['simctl', 'launch', 'booted', APP_ID], { stdio: 'inherit' });
+    return;
+  }
+  execFileSync('adb', ['shell', 'monkey', '-p', APP_ID, '-c', 'android.intent.category.LAUNCHER', '1'], { stdio: 'inherit' });
+
+}
+
+
+/********************************************************************
+Post a walk command to the server (command mode).
+
+@param {String}      theme  - Template name
+@param {String|null} family - One family, or null for all
+
+@return {Promise<undefined>}
+*********************************************************************/
+async function postCommand (theme, family) {
+
+  const response = await fetch('http://localhost:' + PORT + '/command', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ theme: theme, family: family })
+  });
+  if (!response.ok) {
+    throw new Error('native-walk: POST /command answered ' + response.status);
+  }
+  await response.text();
+
+}
+
+
+/********************************************************************
+Start a walk: a deep link in link mode, a server command in command mode.
+
+@param {String}      theme  - Template name
+@param {String|null} family - One family, or null for all
+
+@return {Promise<undefined>}
+*********************************************************************/
+async function startWalk (theme, family) {
+
+  if (MODE === 'command') {
+    await postCommand(theme, family);
+    return;
+  }
+  const reportUrl = 'http://' + HOST + ':' + PORT + '/report';
+  openLink(family
+    ? 'nimbus://walk/' + family + '?theme=' + theme
+    : 'nimbus://walk?theme=' + theme + '&report=' + encodeURIComponent(reportUrl));
+
+}
+
+
+/********************************************************************
 Screenshot the booted device into a PNG file.
 
 @param {String} file - Output path
@@ -128,14 +199,21 @@ async function waitForFile (file, seconds) {
 
 const missing = [];
 
+// Command mode: the app runs once and takes every command from the server
+if (MODE === 'command') {
+  stopApp();
+  launchApp();
+}
+
 for (const theme of THEMES) {
 
   // Walk every family and wait for the report
   const report = join(OUT, PLATFORM + '-' + theme + '.json');
-  const reportUrl = 'http://' + HOST + ':' + PORT + '/report';
-  process.stdout.write('native-walk: ' + PLATFORM + ' ' + theme + ' -> ' + report + '\n');
-  stopApp();
-  openLink('nimbus://walk?theme=' + theme + '&report=' + encodeURIComponent(reportUrl));
+  process.stdout.write('native-walk: ' + PLATFORM + ' ' + theme + ' (' + MODE + ') -> ' + report + '\n');
+  if (MODE === 'link') {
+    stopApp();
+  }
+  await startWalk(theme, null);
   if (!await waitForFile(report, TIMEOUT_S)) {
     missing.push(report);
     screenshot(join(OUT, PLATFORM + '-' + theme + '-TIMEOUT.png'));
@@ -144,7 +222,7 @@ for (const theme of THEMES) {
 
   // One screenshot per family
   for (const family of FAMILIES) {
-    openLink('nimbus://walk/' + family + '?theme=' + theme);
+    await startWalk(theme, family);
     await new Promise(function (done) {
       setTimeout(done, 5000);
     });
