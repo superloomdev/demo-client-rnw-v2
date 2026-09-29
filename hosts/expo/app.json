@@ -12,7 +12,6 @@
       "bundleIdentifier": "com.anonymous.nimbusrnwdemo"
     },
     "android": {
-      "edgeToEdgeEnabled": true,
       "package": "com.anonymous.nimbusrnwdemo"
     },
     "web": {
@@ -22,7 +21,15 @@
     "plugins": [
       "expo-router",
       "expo-asset",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": false

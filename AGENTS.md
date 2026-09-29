@@ -25,6 +25,10 @@ From `hosts/expo/`:
 - `npx expo export --platform web` - Metro web export (same routes and selection)
 - Native walker by deep link: `nimbus://walk?theme=<t>&report=<url>`, one family `nimbus://walk/<Family>?theme=<t>`
 
+### Native gate
+
+`.github/workflows/native-gate.yml` (`workflow_dispatch` and `milestone-*` tags) runs the web walker for reference numbers, then builds the Expo app in Release on an iOS simulator and an Android emulator, drives the walker with `scripts/native-walk.js` against `scripts/walk-server.js`, and asserts with `scripts/walk-assert.js` (zero render errors, every sample state measured, sans family drawn as named, every cell within one point of the web run). Artifacts: `web-walk`, `ios-walk`, `android-walk` (reports and per-family screenshots). The Android Release build posts over plain HTTP to `10.0.2.2`, which is why `app.json` enables `usesCleartextTraffic` through `expo-build-properties`.
+
 Always delete `node_modules` and `package-lock.json` before testing. Consumer repos install from the GitHub Packages registry; stale installs mask breakage.
 
 ## Component library dependency

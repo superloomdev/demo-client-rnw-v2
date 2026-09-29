@@ -1,0 +1,179 @@
+# Native gate: the walker on an iOS simulator and an Android emulator.
+#
+# 1. web-walk runs the web walker (the e2e walker spec) and uploads its
+#    reports: the reference numbers native geometry is compared against.
+# 2. ios and android build the Expo app in Release, start the walk server,
+#    open nimbus://walk?theme=<t>&report=<url> for every template, wait for
+#    each report, screenshot every family (nimbus://walk/<Family>?theme=<t>),
+#    then assert the reports (scripts/walk-assert.js): zero render errors,
+#    every sample state measured with a size, the sans family drawn as
+#    named, and every cell equal to the web run within one point.
+# Simulator evidence is simulator evidence; real devices are a later claim.
+#
+# The component library is file:-linked from its sibling repository, so
+# every job checks out both side by side.
+
+name: Native Gate
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['milestone-*']
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+
+  web-walk:
+    name: Web walker reference
+    runs-on: ubuntu-latest
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: codebase-demo-client-rnw-v2
+      - uses: actions/checkout@v7
+        with:
+          repository: superloomdev/rnw-components-v2
+          path: codebase-rnw-components-v2
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          registry-url: 'https://npm.pkg.github.com'
+      - name: Install and build web host
+        working-directory: codebase-demo-client-rnw-v2/hosts/web
+        run: |
+          npm ci
+          npx vite build
+      - name: Run the web walker
+        working-directory: codebase-demo-client-rnw-v2
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+          npx playwright test e2e/walker.spec.js
+      - name: Upload web reports
+        uses: actions/upload-artifact@v7
+        with:
+          name: web-walk
+          path: codebase-demo-client-rnw-v2/test-results/walk/
+          retention-days: 14
+
+  ios:
+    name: iOS simulator
+    needs: [web-walk]
+    runs-on: macos-latest
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: codebase-demo-client-rnw-v2
+      - uses: actions/checkout@v7
+        with:
+          repository: superloomdev/rnw-components-v2
+          path: codebase-rnw-components-v2
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          registry-url: 'https://npm.pkg.github.com'
+      - name: Download web reports
+        uses: actions/download-artifact@v8
+        with:
+          name: web-walk
+          path: web-walk
+      - name: Cache Pods
+        uses: actions/cache@v6
+        with:
+          path: codebase-demo-client-rnw-v2/hosts/expo/ios/Pods
+          key: pods-${{ hashFiles('codebase-demo-client-rnw-v2/hosts/expo/package-lock.json') }}
+      - name: Install, prebuild and build Release on the simulator
+        working-directory: codebase-demo-client-rnw-v2/hosts/expo
+        run: |
+          npm ci
+          npx expo prebuild --platform ios --no-install
+          (cd ios && pod install)
+          npx expo run:ios --configuration Release --device "iPhone 16" --no-bundler
+      - name: Walk every template
+        working-directory: codebase-demo-client-rnw-v2
+        run: |
+          mkdir -p walk-out
+          node scripts/walk-server.js --port 8787 --out walk-out > walk-out/walk-server.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://localhost:8787/health && break; sleep 1; done
+          node scripts/native-walk.js --platform ios --out walk-out
+      - name: Assert the reports
+        working-directory: codebase-demo-client-rnw-v2
+        run: node scripts/walk-assert.js --platform ios --dir walk-out --web ../web-walk
+      - name: Upload iOS evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios-walk
+          path: codebase-demo-client-rnw-v2/walk-out/
+          retention-days: 14
+
+  android:
+    name: Android emulator
+    needs: [web-walk]
+    runs-on: ubuntu-latest
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GRADLE_OPTS: -Xmx4g
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: codebase-demo-client-rnw-v2
+      - uses: actions/checkout@v7
+        with:
+          repository: superloomdev/rnw-components-v2
+          path: codebase-rnw-components-v2
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          registry-url: 'https://npm.pkg.github.com'
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Download web reports
+        uses: actions/download-artifact@v8
+        with:
+          name: web-walk
+          path: web-walk
+      - name: Install, prebuild and assemble Release
+        working-directory: codebase-demo-client-rnw-v2/hosts/expo
+        run: |
+          npm ci
+          npx expo prebuild --platform android --no-install
+          (cd android && ./gradlew assembleRelease)
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Walk every template on the emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          working-directory: codebase-demo-client-rnw-v2
+          script: |
+            adb install hosts/expo/android/app/build/outputs/apk/release/app-release.apk
+            mkdir -p walk-out
+            node scripts/walk-server.js --port 8787 --out walk-out > walk-out/walk-server.log 2>&1 &
+            sleep 3
+            node scripts/native-walk.js --platform android --out walk-out --report-host 10.0.2.2
+      - name: Assert the reports
+        working-directory: codebase-demo-client-rnw-v2
+        run: node scripts/walk-assert.js --platform android --dir walk-out --web ../web-walk
+      - name: Upload Android evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-walk
+          path: codebase-demo-client-rnw-v2/walk-out/
+          retention-days: 14

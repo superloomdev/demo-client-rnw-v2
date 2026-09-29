@@ -15,3 +15,5 @@ e2e/screenshots/
 # Darwin (macOS) visual snapshots - platform-specific, CI on Linux cannot reproduce
 *-snapshots/*-darwin.png
 
+walk-out/
+web-walk/
