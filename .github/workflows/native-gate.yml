@@ -98,7 +98,7 @@ jobs:
           (cd ios && pod install)
           # The runner image's simulator set changes; take the first available
           # iPhone of the newest iOS runtime instead of naming one
-          DEVICE=$(xcrun simctl list devices available -j | node scripts/pick-simulator.js)
+          DEVICE=$(xcrun simctl list devices available -j | node ../../scripts/pick-simulator.js)
           echo "simulator: $DEVICE"
           npx expo run:ios --configuration Release --device "$DEVICE" --no-bundler
       - name: Walk every template

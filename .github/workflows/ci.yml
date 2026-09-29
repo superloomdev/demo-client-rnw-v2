@@ -75,6 +75,9 @@ jobs:
       - name: G5 - CI step map covers every workflow step
         run: |
           node scripts/ci-census.js --check-map
+      - name: G6 - Every node script a workflow runs exists from its working directory
+        run: |
+          node scripts/check-workflow-paths.js
 
   lint:
     name: Lint
