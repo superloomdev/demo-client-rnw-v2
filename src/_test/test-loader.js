@@ -17,6 +17,7 @@ import ShowcaseIndex from '../screens/showcase/ShowcaseIndex.js';
 import FamilyPage from '../screens/showcase/FamilyPage.js';
 import { getFamilies, getHref } from '../screens/showcase/catalog.js';
 import { buildReport } from '../screens/walk/report.js';
+import Walker from '../screens/walk/Walker.js';
 import navigationAdapter from './adapters/navigation.js';
 import fontsAdapter from './adapters/fonts.js';
 
@@ -188,6 +189,30 @@ describe('showcase', function () {
     });
   }
 
+  test('a new profile, scheme or brand prop on a mounted provider re-derives the theme', async function () {
+    const App = function (props) {
+      const { ThemeProvider } = Lib.ThemeContext;
+      return React.createElement(ThemeProvider, props.theme, React.createElement(ShowcaseIndex));
+    };
+    let renderer;
+    await act(async function () {
+      renderer = TestRenderer.create(React.createElement(LibProvider, { adapters: ADAPTERS },
+        React.createElement(App, { theme: { profile: 'default' } })));
+    });
+    assert.ok(texts(renderer.toJSON()).includes('default / light'));
+    for (const next of [{ profile: 'carbon', line: 'carbon / white' }, { profile: 'carbon', scheme: 'g90', line: 'carbon / g90' }, { profile: 'material', brand: 'acme', line: 'material / light + acme' }]) {
+      await act(async function () {
+        renderer.update(React.createElement(LibProvider, { adapters: ADAPTERS },
+          React.createElement(App, { theme: { profile: next.profile, scheme: next.scheme, brand: next.brand } })));
+      });
+      const lines = texts(renderer.toJSON());
+      assert.ok(lines.includes(next.line), 'expected "' + next.line + '", got ' + lines.join(' | '));
+    }
+    await act(async function () {
+      renderer.unmount();
+    });
+  });
+
   test('an unknown profile is a programmer error', async function () {
     await assert.rejects(async function () {
       await renderThemed(React.createElement(ShowcaseIndex), { profile: 'nope' });
@@ -215,6 +240,69 @@ describe('acme brand', function () {
       assert.equal(Object.keys(result.Registry).length, Object.keys(Lib.Components.factories).length);
     });
   }
+
+});
+
+
+describe('walker', function () {
+
+  /********************************************************************
+  Fire every cell's onLayout, as a native layout pass would.
+
+  @param {Object} renderer - Test renderer
+
+  @return {Promise<Number>} - Cells laid out
+  *********************************************************************/
+  async function layOut (renderer) {
+
+    const bodies = renderer.root.findAll(function (node) {
+      return typeof node.props.testID === 'string' && node.props.testID.indexOf('body-') === 0 && typeof node.props.onLayout === 'function';
+    }).filter(function (node, index, all) {
+      return all.findIndex(function (other) {
+        return other.props.testID === node.props.testID;
+      }) === index;
+    });
+    await act(async function () {
+      for (const body of bodies) {
+        body.props.onLayout({ nativeEvent: { layout: { width: 20, height: 20 } } });
+      }
+    });
+
+    return bodies.length;
+
+  }
+
+  test('a mounted walker walks again, under the new theme, when a warm deep link changes it', async function () {
+    const expected = Lib.Components.catalog.reduce(function (sum, entry) {
+      return sum + entry.sample.length;
+    }, 0);
+    const App = function (props) {
+      const { ThemeProvider } = Lib.ThemeContext;
+      return React.createElement(ThemeProvider, { profile: props.profile }, React.createElement(Walker));
+    };
+    let renderer;
+    await act(async function () {
+      renderer = TestRenderer.create(React.createElement(LibProvider, { adapters: ADAPTERS }, React.createElement(App, { profile: 'default' })));
+    });
+    for (const profile of ['default', 'carbon', 'material']) {
+      if (profile !== 'default') {
+        await act(async function () {
+          renderer.update(React.createElement(LibProvider, { adapters: ADAPTERS }, React.createElement(App, { profile: profile })));
+        });
+      }
+      globalThis.__walk = undefined;
+      assert.equal(await layOut(renderer), expected, profile + ': cells to lay out');
+      assert.ok(globalThis.__walk, profile + ': no report was built');
+      assert.equal(globalThis.__walk.theme, profile);
+      assert.equal(globalThis.__walk.cells.length, expected);
+      assert.ok(texts(renderer.toJSON()).some(function (line) {
+        return line.indexOf('walk: done') === 0;
+      }), profile + ': status');
+    }
+    await act(async function () {
+      renderer.unmount();
+    });
+  });
 
 });
 

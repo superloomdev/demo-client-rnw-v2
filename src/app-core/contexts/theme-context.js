@@ -75,6 +75,15 @@ const ThemeContext = {
     const [schemeName, setSchemeName] = React.useState(props.scheme || null);
     const [brandName, setBrandName] = React.useState(props.brand || null);
 
+    // Follow the props: a host that re-renders the provider with a new
+    // selection (a deep link reaching a running app, a URL change) re-derives
+    // the theme. The controller's setters still switch it in between.
+    React.useEffect(function () {
+      setProfileName(props.profile || Lib.Config.theme.DEFAULT_PROFILE);
+      setSchemeName(props.scheme || null);
+      setBrandName(props.brand || null);
+    }, [props.profile, props.scheme, props.brand]);
+
     // Init the re-derive epoch an async font load bumps
     const [epoch, setEpoch] = React.useState(0);
     const rederive = React.useCallback(function () {

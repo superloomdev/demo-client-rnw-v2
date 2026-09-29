@@ -11,7 +11,9 @@ import { buildReport } from './report.js';
 
 
 /********************************************************************
-Walker screen.
+Walker screen. A new theme selection or a new walk request (a deep link
+reaching a running app) starts a fresh walk: the run is keyed by both, so
+its measurements and send status never carry over.
 
 @param {Object} props          - React props
 @param {String} [props.family] - Walk one family only
@@ -20,6 +22,27 @@ Walker screen.
 @return {Object} - React element
 *********************************************************************/
 export default function Walker (props) {
+
+  // Init the container and the selection the run is keyed by
+  const Lib = useLib();
+  const React = Lib.React;
+  const ctx = Lib.ThemeContext.useThemeController();
+  const key = [ctx.profileName, ctx.schemeName, ctx.brandName || '', props.family || '', props.report || ''].join('|');
+
+  // Render one run per selection and request
+  return React.createElement(WalkerRun, { key: key, family: props.family, report: props.report });
+
+}
+
+
+/********************************************************************
+One walk under one theme selection.
+
+@param {Object} props - As Walker
+
+@return {Object} - React element
+*********************************************************************/
+function WalkerRun (props) {
 
   // Init the container, the theme controller and the cell component
   const Lib = useLib();

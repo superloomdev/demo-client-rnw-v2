@@ -7,6 +7,11 @@
 // Usage: node scripts/native-walk.js --platform ios|android --out <dir>
 //          [--report-host localhost|10.0.2.2] [--port 8787]
 //          [--themes default,carbon,material] [--timeout 180]
+//          [--app-id com.anonymous.nimbusrnwdemo]
+//
+// Each template's walk starts from a stopped app, so the link cold-starts
+// it; the per-family links then reach the running app (warm), which is the
+// path a user's deep link takes most of the time. Both must work.
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, writeFileSync } from 'node:fs';
@@ -24,6 +29,7 @@ const PORT = arg('--port', '8787');
 const HOST = arg('--report-host', PLATFORM === 'android' ? '10.0.2.2' : 'localhost');
 const THEMES = arg('--themes', 'default,carbon,material').split(',');
 const TIMEOUT_S = Number(arg('--timeout', '180'));
+const APP_ID = arg('--app-id', 'com.anonymous.nimbusrnwdemo');
 
 if (PLATFORM !== 'ios' && PLATFORM !== 'android') {
   process.stderr.write('native-walk: --platform must be ios or android\n');
@@ -52,6 +58,27 @@ function openLink (url) {
     return;
   }
   execFileSync('adb', ['shell', 'am', 'start', '-W', '-a', 'android.intent.action.VIEW', '-d', '"' + url + '"'], { stdio: 'inherit' });
+
+}
+
+
+/********************************************************************
+Stop the app so the next link cold-starts it. Stopping an app that is not
+running is not an error.
+
+@return {undefined}
+*********************************************************************/
+function stopApp () {
+
+  try {
+    if (PLATFORM === 'ios') {
+      execFileSync('xcrun', ['simctl', 'terminate', 'booted', APP_ID], { stdio: 'ignore' });
+    } else {
+      execFileSync('adb', ['shell', 'am', 'force-stop', APP_ID], { stdio: 'ignore' });
+    }
+  } catch {
+    // Not running: nothing to stop
+  }
 
 }
 
@@ -107,6 +134,7 @@ for (const theme of THEMES) {
   const report = join(OUT, PLATFORM + '-' + theme + '.json');
   const reportUrl = 'http://' + HOST + ':' + PORT + '/report';
   process.stdout.write('native-walk: ' + PLATFORM + ' ' + theme + ' -> ' + report + '\n');
+  stopApp();
   openLink('nimbus://walk?theme=' + theme + '&report=' + encodeURIComponent(reportUrl));
   if (!await waitForFile(report, TIMEOUT_S)) {
     missing.push(report);
