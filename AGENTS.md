@@ -7,6 +7,7 @@ From the repo root:
 - `npm run verify` - **run this before every push to `main`.** Every CI step in CI order: the enforcement greps replayed from `ci.yml`, clean installs of root, `src/_test`, `hosts/web`, `hosts/expo`, eslint, the Node test host, the web build, the Expo web export and the Playwright e2e suite, then the parity assertion that every mapped step executed and the `.verify-stamp` the pre-push hook checks
 - `npm run verify:fast` - the same without e2e; never writes the stamp
 - `npm run verify:gates` - the enforcement greps only
+  (each CI job's replayed steps run with that job's filesystem: every `node_modules` the job does not install is set aside as `node_modules.verify-aside` and restored afterwards)
 - `npm run lint` - eslint .
 - `npm run lint:fix` - eslint . --fix
 - `npm run test:e2e` - Playwright over `vite preview` (build `hosts/web` first) plus the walk server: readiness, structural, accessibility identity across profiles, `acme` brand reach, the walker end to end, per-family screenshots in `test-results/showcase/`

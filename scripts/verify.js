@@ -18,7 +18,7 @@
 //                                    still requires one full run
 
 import { execSync } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -54,12 +54,111 @@ function getGates () {
     }
     gates.push({
       name: step.name,
+      job: step.job,
       script: step.run || '',
       workdir: step.working_directory || ''
     });
   }
 
   return gates;
+
+}
+
+
+/********************************************************************
+The directories a CI job installs: the working directory of each of its
+steps whose kind the census classifies as `install`.
+
+@param {String} job - Job key in ci.yml
+
+@return {Array} - Repo-relative directories ('' for the root)
+*********************************************************************/
+function getJobInstallDirs (job) {
+
+  const steps = JSON.parse(execSync('node scripts/ci-census.js --json', { cwd: REPO_ROOT, encoding: 'utf8' }));
+
+  return steps.filter(function (step) {
+    return step.job === job && step.kind === 'install';
+  }).map(function (step) {
+    return (step.working_directory || '').replace(/\/$/, '');
+  });
+
+}
+
+
+/********************************************************************
+Every node_modules directory in the working tree, outside other
+node_modules and .git, as repo-relative parent directories.
+
+@return {Array} - Parent directories ('' for the root)
+*********************************************************************/
+function getInstalledDirs () {
+
+  const out = [];
+  const walk = function (relative, depth) {
+    const absolute = path.join(REPO_ROOT, relative);
+    for (const name of readdirSync(absolute)) {
+      if (name === '.git' || name.endsWith('.verify-aside')) {
+        continue;
+      }
+      const child = path.join(absolute, name);
+      if (!statSync(child).isDirectory()) {
+        continue;
+      }
+      if (name === 'node_modules') {
+        out.push(relative);
+        continue;
+      }
+      if (depth < 3) {
+        walk(path.join(relative, name), depth + 1);
+      }
+    }
+  };
+  walk('', 0);
+
+  return out;
+
+}
+
+
+/********************************************************************
+Run a job's replayed steps with the job's filesystem: every node_modules
+the job does not install is set aside for the duration and restored
+afterwards, so a step that reads packages its job never installs fails
+here exactly as it fails on CI (pitfalls: an enforcement job read
+packages it never installed).
+
+@param {String}   job - Job key
+@param {Function} fn  - The replay
+
+@return {undefined}
+*********************************************************************/
+function withJobFilesystem (job, fn) {
+
+  // Set aside what the job does not install
+  const keep = getJobInstallDirs(job);
+  const aside = getInstalledDirs().filter(function (dir) {
+    return !keep.includes(dir);
+  });
+  for (const dir of aside) {
+    renameSync(path.join(REPO_ROOT, dir, 'node_modules'), path.join(REPO_ROOT, dir, 'node_modules.verify-aside'));
+  }
+
+  // Replay the job's install steps the working tree has not run yet
+  for (const dir of keep) {
+    if (!existsSync(path.join(REPO_ROOT, dir, 'node_modules'))) {
+      install('npm install', path.join(REPO_ROOT, dir));
+    }
+  }
+
+  // Replay, then restore whatever happens
+  try {
+    fn();
+  } finally {
+    for (const dir of aside) {
+      renameSync(path.join(REPO_ROOT, dir, 'node_modules.verify-aside'), path.join(REPO_ROOT, dir, 'node_modules'));
+    }
+  }
 
 }
 
@@ -201,15 +300,27 @@ const failed = [];
 let passed = 0;
 const executed = [];
 
-for (const gate of gates) {
-  const ok = runCheck(gate.name, function () {
-    sh(gate.script, gate.workdir ? path.join(REPO_ROOT, gate.workdir) : REPO_ROOT);
+// Replay the gates job by job, each with that job's filesystem
+const gateJobs = gates.map(function (gate) {
+  return gate.job;
+}).filter(function (job, index, all) {
+  return all.indexOf(job) === index;
+});
+for (const job of gateJobs) {
+  withJobFilesystem(job, function () {
+    for (const gate of gates.filter(function (entry) {
+      return entry.job === job;
+    })) {
+      const ok = runCheck(gate.name, function () {
+        sh(gate.script, gate.workdir ? path.join(REPO_ROOT, gate.workdir) : REPO_ROOT);
+      });
+      if (ok) {
+        passed++;
+      } else {
+        failed.push(gate.name);
+      }
+    }
   });
-  if (ok) {
-    passed++;
-  } else {
-    failed.push(gate.name);
-  }
 }
 executed.push('gates');
 

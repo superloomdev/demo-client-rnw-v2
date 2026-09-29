@@ -17,3 +17,6 @@ e2e/screenshots/
 
 walk-out/
 web-walk/
+
+# Transient: node_modules set aside by scripts/verify.js while it replays a CI job
+**/node_modules.verify-aside/
