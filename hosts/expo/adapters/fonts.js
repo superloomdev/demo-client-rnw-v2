@@ -13,6 +13,8 @@ import {
   Roboto_500Medium,
   Roboto_700Bold
 } from '@expo-google-fonts/roboto';
+import { IBMPlexMono_400Regular } from '@expo-google-fonts/ibm-plex-mono';
+import { RobotoMono_400Regular } from '@expo-google-fonts/roboto-mono';
 
 
 export default function (Lib, config) { // eslint-disable-line no-unused-vars
@@ -37,6 +39,24 @@ export default function (Lib, config) { // eslint-disable-line no-unused-vars
         bold: {
           asset: IBMPlexSans_700Bold,
           weight: '700',
+          style: 'normal'
+        }
+      }
+    },
+    'IBM Plex Mono': {
+      styles: {
+        normal: {
+          asset: IBMPlexMono_400Regular,
+          weight: '400',
+          style: 'normal'
+        }
+      }
+    },
+    'Roboto Mono': {
+      styles: {
+        normal: {
+          asset: RobotoMono_400Regular,
+          weight: '400',
           style: 'normal'
         }
       }

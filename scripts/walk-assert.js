@@ -1,10 +1,16 @@
 // Info: Asserts walker reports for the native gate. For each template's
 // report on the platform: zero render errors, one measured cell per catalog
-// sample state, every cell larger than zero, and the sans family the theme
-// names actually drawn (the serif and mono roles are listed, not failed,
-// until the hosts carry those families). With `--web <dir>`, every cell's
-// size must equal the web walker's within one point: the same tokens produce
-// the same numbers on every platform.
+// sample state, every cell larger than zero, and the sans and mono families
+// the theme names actually drawn (the serif role is listed, not failed,
+// until the hosts carry it). With `--web <dir>`, the web report must have
+// drawn the same families (a baseline measured in a fallback face is no
+// baseline), and every cell must match the web walker's: height within one
+// point, width within one point or 4% of the web width, whichever is larger.
+// The same tokens produce the same boxes on every platform; the width
+// allowance is for text shaping only, because Chrome, iOS and Android shape
+// one font file with different glyph advances (Milestone 1 measured up to
+// 3.3% on a label). A face that was not drawn (about 10%) or a field that
+// collapsed (about 80%) is far outside it.
 //
 // Usage: node scripts/walk-assert.js --platform ios|android --dir <dir>
 //          [--web <dir>] [--themes default,carbon,material]
@@ -22,6 +28,9 @@ const DIR = resolve(arg('--dir', 'walk-out'));
 const WEB = arg('--web', null);
 const THEMES = arg('--themes', 'default,carbon,material').split(',');
 const TOLERANCE = 1;
+const WIDTH_SHARE = 0.04;
+// Font roles whose family must be drawn as named; the others are reported
+const REQUIRED_FONTS = ['font.family.sans', 'font.family.mono'];
 
 const failures = [];
 const warnings = [];
@@ -62,10 +71,10 @@ for (const theme of THEMES) {
   });
   check(empty.length === 0, theme + ': every cell has a size ' + JSON.stringify(empty));
 
-  // Fonts: sans must be drawn as named; the others are reported
+  // Fonts: sans and mono must be drawn as named; the others are reported
   check(report.fonts.length >= 1, theme + ': font roles reported');
   for (const font of report.fonts) {
-    if (font.role === 'font.family.sans') {
+    if (REQUIRED_FONTS.includes(font.role)) {
       check(font.loaded === true, theme + ': ' + font.role + ' "' + font.family + '" drawn as named (drawn "' + font.drawn + '")');
     } else if (!font.loaded) {
       warnings.push(theme + ': ' + font.role + ' "' + font.family + '" not carried by the host; drawn in "' + font.drawn + '"');
@@ -80,6 +89,11 @@ for (const theme of THEMES) {
       continue;
     }
     const web = JSON.parse(readFileSync(webFile, 'utf8'));
+    for (const font of web.fonts.filter(function (entry) {
+      return REQUIRED_FONTS.includes(entry.role);
+    })) {
+      check(font.loaded === true, theme + ': web baseline drew ' + font.role + ' "' + font.family + '" as named (drawn "' + font.drawn + '")');
+    }
     const webCells = {};
     for (const cell of web.cells) {
       webCells[cell.component + '/' + cell.state] = cell;
@@ -87,7 +101,8 @@ for (const theme of THEMES) {
     for (const cell of report.cells) {
       const key = cell.component + '/' + cell.state;
       const other = webCells[key];
-      const ok = other !== undefined && Math.abs(cell.width - other.width) <= TOLERANCE && Math.abs(cell.height - other.height) <= TOLERANCE;
+      const ok = other !== undefined && Math.abs(cell.width - other.width) <= Math.max(TOLERANCE, WIDTH_SHARE * other.width) &&
+        Math.abs(cell.height - other.height) <= TOLERANCE;
       check(ok, theme + ': ' + key + ' ' + cell.width + 'x' + cell.height + ' vs web ' + (other ? other.width + 'x' + other.height : 'missing'));
     }
   }

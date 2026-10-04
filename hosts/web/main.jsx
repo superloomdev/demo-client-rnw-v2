@@ -11,7 +11,7 @@ import { createRoot } from 'react-dom/client';
 
 import { LibProvider, useLib } from '../../src/app-core/contexts/lib-context.js';
 import navigationAdapter from './adapters/navigation.js';
-import fontsAdapter from './adapters/fonts.js';
+import fontsAdapter, { DECLARED_FACES } from './adapters/fonts.js';
 
 import ShowcaseIndex from '../../src/screens/showcase/ShowcaseIndex.js';
 import FamilyPage from '../../src/screens/showcase/FamilyPage.js';
@@ -59,9 +59,16 @@ function App () {
 }
 
 
+// Load every declared face, then render: measurements and the walker report
+// see the theme's fonts, never the fallback the browser shows while they load.
+// A face that fails stays unloaded and is reported by the fonts adapter.
 const root = createRoot(document.getElementById('root'));
-root.render(
-  <LibProvider adapters={ADAPTERS}>
-    <App />
-  </LibProvider>
-);
+Promise.allSettled(DECLARED_FACES.map(function (face) {
+  return document.fonts.load(face);
+})).then(function () {
+  root.render(
+    <LibProvider adapters={ADAPTERS}>
+      <App />
+    </LibProvider>
+  );
+});

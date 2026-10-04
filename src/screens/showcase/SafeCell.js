@@ -73,7 +73,8 @@ export default function createSafeCell (Lib) {
       style: { padding: 12, borderWidth: 1, borderStyle: 'dashed', borderColor: '#c6c6c6', alignItems: 'flex-start', gap: 8 }
     },
     React.createElement(Text, { style: { fontSize: 11, color: '#6f6f6f' } }, props.entry.name + ' / ' + props.state.label),
-    React.createElement(View, { testID: 'body-' + id, dataSet: { part: 'body' }, onLayout: props.onLayout },
+    // A component that fills its container is laid out in the frame its catalog entry names
+    React.createElement(View, { testID: 'body-' + id, dataSet: { part: 'body' }, onLayout: props.onLayout, style: props.entry.frame ? { width: props.entry.frame.width } : undefined },
       React.createElement(Boundary, { onError: props.onError },
         React.createElement(props.Component, props.state.props))));
 

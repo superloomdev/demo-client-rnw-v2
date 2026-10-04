@@ -19,8 +19,8 @@ import { getFamilies, getHref } from '../screens/showcase/catalog.js';
 import { buildReport } from '../screens/walk/report.js';
 import Walker from '../screens/walk/Walker.js';
 import Autopilot from '../screens/walk/Autopilot.js';
-import { spawn } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -194,6 +194,22 @@ describe('showcase', function () {
       }
     });
   }
+
+  test('a component whose catalog entry names a frame is laid out in it; every other cell body shrinks to its content', async function () {
+    for (const entry of Lib.Components.catalog) {
+      const renderer = await renderThemed(React.createElement(FamilyPage, { family: entry.family }), { profile: 'carbon' });
+      const body = renderer.root.findAll(function (node) {
+        return typeof node.type === 'string' && node.props['data-testid'] === 'body-' + entry.name + '-' + entry.sample[0].label;
+      })[0];
+      assert.deepEqual(body.props.style || null, entry.frame ? { width: entry.frame.width + 'px' } : null, entry.name);
+      await act(async function () {
+        renderer.unmount();
+      });
+    }
+    assert.ok(Lib.Components.catalog.some(function (entry) {
+      return entry.frame !== null;
+    }), 'no catalog entry names a frame');
+  });
 
   test('a new profile, scheme or brand prop on a mounted provider re-derives the theme', async function () {
     const App = function (props) {
@@ -437,6 +453,80 @@ describe('walk-server', function () {
       server.kill();
       rmSync(out, { recursive: true, force: true });
     }
+  });
+
+});
+
+
+describe('walk-assert', function () {
+
+  const SCRIPT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'scripts', 'walk-assert.js');
+
+
+  /********************************************************************
+  One walker report with one cell and the two required font roles.
+
+  @param {String} platform - 'web' | 'ios'
+  @param {Object} cell     - { width, height }
+  @param {Object} [loaded] - { sans, mono } drawn as named (default true)
+
+  @return {Object} - Report
+  *********************************************************************/
+  function fixture (platform, cell, loaded) {
+
+    const drawn = Object.assign({ sans: true, mono: true }, loaded);
+
+    return {
+      platform: platform,
+      theme: 'default',
+      errors: [],
+      expectedCells: 1,
+      cells: [{ component: 'Button', state: 'default', width: cell.width, height: cell.height }],
+      fonts: [
+        { role: 'font.family.mono', family: 'Mono', drawn: drawn.mono ? 'Mono' : 'System', loaded: drawn.mono },
+        { role: 'font.family.sans', family: 'Sans', drawn: drawn.sans ? 'Sans' : 'System', loaded: drawn.sans }
+      ]
+    };
+
+  }
+
+
+  /********************************************************************
+  Run walk-assert over one native and one web report.
+
+  @param {Object} native - Native report
+  @param {Object} web    - Web report
+
+  @return {Number} - Exit status
+  *********************************************************************/
+  function run (native, web) {
+
+    const dir = mkdtempSync(join(tmpdir(), 'walk-assert-'));
+    try {
+      writeFileSync(join(dir, 'ios-default.json'), JSON.stringify(native));
+      writeFileSync(join(dir, 'web-default.json'), JSON.stringify(web));
+      return spawnSync('node', [SCRIPT, '--platform', 'ios', '--dir', dir, '--web', dir, '--themes', 'default'], { stdio: 'pipe' }).status;
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+
+  }
+
+  const WEB = fixture('web', { width: 100, height: 20 });
+
+  test('a width within the text-shaping allowance (4%) passes; heights must agree within one point', function () {
+    assert.equal(run(fixture('ios', { width: 103.5, height: 20.8 }), WEB), 0);
+    assert.equal(run(fixture('ios', { width: 100, height: 22 }), WEB), 1);
+  });
+
+  test('a face that was not drawn (about 10% wider) and a collapsed field both fail', function () {
+    assert.equal(run(fixture('ios', { width: 110, height: 20 }), WEB), 1);
+    assert.equal(run(fixture('ios', { width: 20, height: 20 }), WEB), 1);
+  });
+
+  test('the sans and mono families must be drawn as named, natively and in the web baseline', function () {
+    assert.equal(run(fixture('ios', { width: 100, height: 20 }, { mono: false }), WEB), 1);
+    assert.equal(run(fixture('ios', { width: 100, height: 20 }), fixture('web', { width: 100, height: 20 }, { sans: false })), 1);
   });
 
 });
