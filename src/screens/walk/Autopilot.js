@@ -59,11 +59,19 @@ export default function Autopilot (props) {
     };
   }, [props.server, props.pollMs]);
 
+  // Build the walker for the current command once per command: a poll only
+  // advances the counter, and an unchanged element lets React skip the
+  // cells, so polling never re-renders the walk (a full-catalog render can
+  // outlast the poll interval)
+  const walker = React.useMemo(function () {
+    return command ? React.createElement(ThemeProvider, { key: JSON.stringify(command), profile: command.theme, scheme: command.scheme, brand: command.brand },
+      React.createElement(Walker, { family: command.family || undefined, report: props.server + '/report' })) : null;
+  }, [command, props.server, ThemeProvider]);
+
   // Render the status line and, under a command, the walker for it
   return React.createElement(View, { testID: 'autopilot', style: { flex: 1 } },
     React.createElement(Text, { testID: 'autopilot-command' },
       'autopilot: ' + (command ? command.theme + ' / ' + (command.family || 'all') : 'waiting') + ' (' + polls + ')'),
-    command ? React.createElement(ThemeProvider, { key: JSON.stringify(command), profile: command.theme, scheme: command.scheme, brand: command.brand },
-      React.createElement(Walker, { family: command.family || undefined, report: props.server + '/report' })) : null);
+    walker);
 
 }

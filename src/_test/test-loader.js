@@ -316,9 +316,14 @@ describe('walker', function () {
 describe('autopilot', function () {
 
   test('takes each command from the server, walks under that theme and posts the report', async function () {
-    const expected = Lib.Components.catalog.reduce(function (sum, entry) {
-      return sum + entry.sample.length;
-    }, 0);
+    // Cells a command walks: every family's, or the named family's
+    const cellsFor = function (family) {
+      return Lib.Components.catalog.filter(function (entry) {
+        return family === null || entry.family === family;
+      }).reduce(function (sum, entry) {
+        return sum + entry.sample.length;
+      }, 0);
+    };
 
     // Stub the server: GET /command answers the current command, POST /report records
     let command = null;
@@ -368,6 +373,7 @@ describe('autopilot', function () {
             return other.props.testID === node.props.testID;
           }) === index;
         });
+        const expected = cellsFor(next.family);
         assert.equal(bodies.length, expected, next.theme + ': cells');
         await act(async function () {
           for (const body of bodies) {
