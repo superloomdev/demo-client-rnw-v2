@@ -514,13 +514,15 @@ describe('walk-assert', function () {
 
   const WEB = fixture('web', { width: 100, height: 20 });
 
-  test('a width within the text-shaping allowance (4%) passes; heights must agree within one point', function () {
-    assert.equal(run(fixture('ios', { width: 103.5, height: 20.8 }), WEB), 0);
+  test('widths agree within two points (one pixel rounding per platform), heights within one', function () {
+    assert.equal(run(fixture('ios', { width: 101.67, height: 20.8 }), WEB), 0);
+    assert.equal(run(fixture('ios', { width: 98, height: 20 }), WEB), 0);
+    assert.equal(run(fixture('ios', { width: 102.5, height: 20 }), WEB), 1);
     assert.equal(run(fixture('ios', { width: 100, height: 22 }), WEB), 1);
   });
 
-  test('a face that was not drawn (about 10% wider) and a collapsed field both fail', function () {
-    assert.equal(run(fixture('ios', { width: 110, height: 20 }), WEB), 1);
+  test('a face that was not drawn (a few points on a label) and a collapsed field both fail', function () {
+    assert.equal(run(fixture('ios', { width: 104, height: 20 }), WEB), 1);
     assert.equal(run(fixture('ios', { width: 20, height: 20 }), WEB), 1);
   });
 

@@ -12,12 +12,14 @@
 
 // Faces index.html declares; keep in step with its @font-face rules
 export const DECLARED_FACES = [
+  '300 16px "IBM Plex Sans"',
   '400 16px "IBM Plex Sans"',
   '500 16px "IBM Plex Sans"',
   '600 16px "IBM Plex Sans"',
   '700 16px "IBM Plex Sans"',
   '400 16px "Roboto"',
   '500 16px "Roboto"',
+  '600 16px "Roboto"',
   '700 16px "Roboto"',
   '400 16px "IBM Plex Mono"',
   '400 16px "Roboto Mono"'

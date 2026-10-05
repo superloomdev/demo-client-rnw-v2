@@ -5,12 +5,11 @@
 // until the hosts carry it). With `--web <dir>`, the web report must have
 // drawn the same families (a baseline measured in a fallback face is no
 // baseline), and every cell must match the web walker's: height within one
-// point, width within one point or 4% of the web width, whichever is larger.
-// The same tokens produce the same boxes on every platform; the width
-// allowance is for text shaping only, because Chrome, iOS and Android shape
-// one font file with different glyph advances (Milestone 1 measured up to
-// 3.3% on a label). A face that was not drawn (about 10%) or a field that
-// collapsed (about 80%) is far outside it.
+// point, width within two. The same tokens and the same font files produce
+// the same boxes on every platform; the width margin is pixel rounding only,
+// because each platform rounds a text run up to its own pixel grid (the web
+// and Android to whole points, iOS to thirds) once per side. A face that is
+// not drawn moves a label by several points, a collapsed field by a hundred.
 //
 // Usage: node scripts/walk-assert.js --platform ios|android --dir <dir>
 //          [--web <dir>] [--themes default,carbon,material]
@@ -28,7 +27,7 @@ const DIR = resolve(arg('--dir', 'walk-out'));
 const WEB = arg('--web', null);
 const THEMES = arg('--themes', 'default,carbon,material').split(',');
 const TOLERANCE = 1;
-const WIDTH_SHARE = 0.04;
+const WIDTH_TOLERANCE = 2;
 // Font roles whose family must be drawn as named; the others are reported
 const REQUIRED_FONTS = ['font.family.sans', 'font.family.mono'];
 
@@ -101,7 +100,7 @@ for (const theme of THEMES) {
     for (const cell of report.cells) {
       const key = cell.component + '/' + cell.state;
       const other = webCells[key];
-      const ok = other !== undefined && Math.abs(cell.width - other.width) <= Math.max(TOLERANCE, WIDTH_SHARE * other.width) &&
+      const ok = other !== undefined && Math.abs(cell.width - other.width) <= WIDTH_TOLERANCE &&
         Math.abs(cell.height - other.height) <= TOLERANCE;
       check(ok, theme + ': ' + key + ' ' + cell.width + 'x' + cell.height + ' vs web ' + (other ? other.width + 'x' + other.height : 'missing'));
     }

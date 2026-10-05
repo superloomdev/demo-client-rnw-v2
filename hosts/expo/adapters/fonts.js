@@ -1,9 +1,15 @@
 // Info: Expo adapter for the Fonts slot. Supplies the platform font loader
 // extension and the host's font asset manifest. Every Expo-only font package
 // is imported here and nowhere else. The @expo-google-fonts packages have no
-// default export, so each face is a named import.
+// default export, so each face is a named import. The faces are the weights
+// the templates' type sets name. On Android the same files are also embedded
+// at build time as one font family per name (app.json, expo-font plugin):
+// the runtime loader registers each face under an alias, and Android looks a
+// `fontFamily` up only by registered name, so without the embedded family it
+// draws its system face for every theme family.
 import FontExtExpo from '@superloomdev/js-client-helper-font-ext-expo';
 import {
+  IBMPlexSans_300Light,
   IBMPlexSans_400Regular,
   IBMPlexSans_600SemiBold,
   IBMPlexSans_700Bold
@@ -11,6 +17,7 @@ import {
 import {
   Roboto_400Regular,
   Roboto_500Medium,
+  Roboto_600SemiBold,
   Roboto_700Bold
 } from '@expo-google-fonts/roboto';
 import { IBMPlexMono_400Regular } from '@expo-google-fonts/ibm-plex-mono';
@@ -26,6 +33,11 @@ export default function (Lib, config) { // eslint-disable-line no-unused-vars
   const manifest = {
     'IBM Plex Sans': {
       styles: {
+        light: {
+          asset: IBMPlexSans_300Light,
+          weight: '300',
+          style: 'normal'
+        },
         normal: {
           asset: IBMPlexSans_400Regular,
           weight: '400',
@@ -71,6 +83,11 @@ export default function (Lib, config) { // eslint-disable-line no-unused-vars
         medium: {
           asset: Roboto_500Medium,
           weight: '500',
+          style: 'normal'
+        },
+        semibold: {
+          asset: Roboto_600SemiBold,
+          weight: '600',
           style: 'normal'
         },
         bold: {

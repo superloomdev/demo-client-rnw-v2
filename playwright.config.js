@@ -15,7 +15,12 @@ export default defineConfig({
     baseURL: 'http://localhost:4173',
     viewport: { width: 1280, height: 720 },
     reducedMotion: 'reduce',
-    ...devices['Desktop Chrome']
+    ...devices['Desktop Chrome'],
+    // Linux Chromium hints glyph advances to whole pixels by default, so the
+    // web walker's text widths (the native gate's baseline) differed from
+    // macOS, iOS and Android by up to 2.5px on short strings; unhinted
+    // advances are the font's own on every platform
+    launchOptions: { args: ['--font-render-hinting=none'] }
   },
   webServer: [
     {
