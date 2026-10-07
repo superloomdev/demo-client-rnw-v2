@@ -2,7 +2,7 @@
 // must reach what the host renders under every profile: its three glyphs in
 // the drawn icons, its color, family and radii in the built theme the
 // walker reports, and, in every rendered component, its family on every
-// drawn text, its focus and interactive colours on whatever focus draws on
+// drawn text, its focus and interactive colors on whatever focus draws on
 // every focusable part and its radius on a corner that names it. A brand that needs a component change to show is a
 // component defect, not a bigger layer.
 import { expect, test } from '@playwright/test';
@@ -96,11 +96,11 @@ for (const profile of PROFILES) {
         return family + ': text still drawn in ' + familyName;
       }));
 
-      // Every enabled focusable part shows its focus in the brand's colours once focused. Each
+      // Every enabled focusable part shows its focus in the brand's colors once focused. Each
       // template draws focus its own way (an outline ring, a border with an inset ring, a field
-      // outline in the interactive colour), so what is checked is every outline, border and shadow
-      // colour focus adds in the cell: at least one, each the brand's focus or interactive colour,
-      // or the page colour a ring draws as its inner line; never the browser's own ring
+      // outline in the interactive color), so what is checked is every outline, border and shadow
+      // color focus adds in the cell: at least one, each the brand's focus or interactive color,
+      // or the page color a ring draws as its inner line; never the browser's own ring
       const focusables = page.locator('[data-cell="true"] :is([role="button"], [role="checkbox"], [role="combobox"], input):not([aria-disabled="true"]):not([disabled])');
       const count = await focusables.count();
       const allowed = [toRgb(ACME['color.focus']), toRgb(ACME['color.interactive'])];
