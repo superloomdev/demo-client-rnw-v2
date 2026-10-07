@@ -2,8 +2,8 @@
 // must reach what the host renders under every profile: its three glyphs in
 // the drawn icons, its color, family and radii in the built theme the
 // walker reports, and, in every rendered component, its family on every
-// drawn text, its focus color on every focusable part and its radius on a
-// corner that names it. A brand that needs a component change to show is a
+// drawn text, its focus and interactive colours on whatever focus draws on
+// every focusable part and its radius on a corner that names it. A brand that needs a component change to show is a
 // component defect, not a bigger layer.
 import { expect, test } from '@playwright/test';
 
@@ -96,29 +96,65 @@ for (const profile of PROFILES) {
         return family + ': text still drawn in ' + familyName;
       }));
 
-      // Every enabled focusable part shows the brand's focus color once focused
+      // Every enabled focusable part shows its focus in the brand's colours once focused. Each
+      // template draws focus its own way (an outline ring, a border with an inset ring, a field
+      // outline in the interactive colour), so what is checked is every outline, border and shadow
+      // colour focus adds in the cell: at least one, each the brand's focus or interactive colour,
+      // or the page colour a ring draws as its inner line; never the browser's own ring
       const focusables = page.locator('[data-cell="true"] :is([role="button"], [role="checkbox"], [role="combobox"], input):not([aria-disabled="true"]):not([disabled])');
       const count = await focusables.count();
+      const allowed = [toRgb(ACME['color.focus']), toRgb(ACME['color.interactive'])];
       for (let i = 0; i < count; i++) {
         const target = focusables.nth(i);
-        await target.focus();
-        // Every ring drawn anywhere in the cell is the brand's: one ring, ours, never the browser's
-        const rings = await target.evaluate(function (node) {
+        const paint = function (node) {
           const cell = node.closest('[data-cell="true"]');
           return Array.from(cell.querySelectorAll('*')).map(function (candidate) {
-            return window.getComputedStyle(candidate);
-          }).filter(function (style) {
-            return style.outlineStyle !== 'none' && parseFloat(style.outlineWidth) > 0;
-          }).map(function (style) {
-            return style.outlineColor;
+            const style = window.getComputedStyle(candidate);
+            return {
+              outline: style.outlineStyle !== 'none' && parseFloat(style.outlineWidth) > 0 ? style.outlineColor : null,
+              border: style.borderTopColor,
+              shadow: style.boxShadow
+            };
           });
+        };
+        const before = await target.evaluate(paint);
+        await target.focus();
+        const after = await target.evaluate(paint);
+        const pageColor = await target.evaluate(function (node) {
+          let current = node;
+          while (current) {
+            const background = window.getComputedStyle(current).backgroundColor;
+            if (background !== 'rgba(0, 0, 0, 0)' && background !== 'transparent') {
+              return background;
+            }
+            current = current.parentElement;
+          }
+          return 'rgb(255, 255, 255)';
+        });
+        const added = [];
+        after.forEach(function (style, index) {
+          const was = before[index] || {};
+          if (style.outline !== null && style.outline !== was.outline) {
+            added.push(style.outline);
+          }
+          if (style.border !== was.border && style.border !== 'rgba(0, 0, 0, 0)') {
+            added.push(style.border);
+          }
+          if (style.shadow !== was.shadow && style.shadow !== 'none') {
+            added.push.apply(added, (style.shadow.match(/rgba?\([^)]*\)/g) || []).filter(function (color) {
+              return !/, 0\)$/.test(color);
+            }));
+          }
         });
         reached.focusables += 1;
-        if (rings.length === 0 || rings.some(function (ring) {
-          return ring !== toRgb(ACME['color.focus']);
+        if (added.length === 0 || added.some(function (color) {
+          return !allowed.includes(color) && color !== pageColor;
         })) {
-          wrong.push(family + ': focus rings ' + JSON.stringify(rings));
+          wrong.push(family + ': focus drew ' + JSON.stringify(added));
         }
+        await target.evaluate(function (node) {
+          node.blur();
+        });
       }
 
       // A corner that names an overridden radius takes the brand's value
