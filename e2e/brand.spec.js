@@ -30,6 +30,155 @@ function toRgb (hex) {
 }
 
 
+// The enabled focusable parts of a showcase page
+const FOCUSABLE = '[data-cell="true"] :is([role="button"], [role="checkbox"], [role="combobox"], input):not([aria-disabled="true"]):not([disabled])';
+// A computed color with zero alpha
+const TRANSPARENT = /^rgba\(.*, 0\)$/;
+
+
+/********************************************************************
+The focus and interactive colors a profile draws without a brand, as the
+walker reports its built theme.
+
+@param {Object} page    - Playwright page
+@param {String} profile - Profile name
+
+@return {Promise<Array>} - [focus, interactive] as `rgb()` strings
+*********************************************************************/
+async function getOwnFocusColors (page, profile) {
+
+  const errors = await openPage(page, '/walk/Icon?profile=' + profile);
+  await expect(page.getByTestId('walk-status')).toContainText('walk: done');
+  const tokens = await page.evaluate(function () {
+    return globalThis.__walk.tokens;
+  });
+  expect(errors).toEqual([]);
+
+  return [toRgb(tokens['color.focus']), toRgb(tokens['color.interactive'])];
+
+}
+
+
+/********************************************************************
+The colors of the ring layers in a computed box-shadow: zero offset, zero
+blur and a spread (an elevation shadow is not a ring).
+
+@param {String} shadow - Computed `box-shadow`
+
+@return {Array} - Colors, transparent layers left out
+*********************************************************************/
+function getRingColors (shadow) {
+
+  if (shadow === 'none') {
+    return [];
+  }
+
+  return shadow.split(/,(?![^(]*\))/).filter(function (layer) {
+    const lengths = (layer.replace(/rgba?\([^)]*\)/, '').match(/-?[\d.]+px/g) || []).map(parseFloat);
+    return lengths.length >= 4 && lengths[0] === 0 && lengths[1] === 0 && lengths[2] === 0 && lengths[3] > 0;
+  }).map(function (layer) {
+    return (layer.match(/rgba?\([^)]*\)/) || [''])[0];
+  }).filter(function (color) {
+    return color !== '' && !TRANSPARENT.test(color);
+  });
+
+}
+
+
+/********************************************************************
+The paint of every element in a focusable part's cell, read in the page.
+
+@param {Object} node - The focusable element
+
+@return {Object} - { state, parts: [{ outlineStyle, outlineWidth, outlineColor, borderColor, borderWidth, shadow, fill }] }
+*********************************************************************/
+function getPaint (node) {
+
+  const cell = node.closest('[data-cell="true"]');
+
+  return {
+    state: cell.getAttribute('data-state'),
+    parts: Array.from(cell.querySelectorAll('*')).map(function (candidate) {
+      const style = window.getComputedStyle(candidate);
+      return {
+        outlineStyle: style.outlineStyle,
+        outlineWidth: style.outlineWidth,
+        outlineColor: style.outlineColor,
+        borderColor: style.borderTopColor,
+        borderWidth: style.borderTopWidth,
+        shadow: style.boxShadow,
+        fill: style.backgroundColor
+      };
+    })
+  };
+
+}
+
+
+/********************************************************************
+What focus draws on every enabled focusable part of a showcase page: the
+colors it adds (a drawn outline, a border, a ring layer, a fill), whether
+anything changed (a border width alone counts), and whether the browser
+drew its own ring.
+
+@param {Object} page   - Playwright page
+@param {String} path   - Showcase path
+@param {String} family - Component family
+
+@return {Promise<Array>} - [{ state, colors, changed, browserRing }] in page order
+*********************************************************************/
+async function getFocusDrawn (page, path, family) {
+
+  const errors = await openPage(page, path);
+  await waitForFamily(page, family);
+  const focusables = page.locator(FOCUSABLE);
+  const count = await focusables.count();
+  const out = [];
+  for (let i = 0; i < count; i++) {
+    const target = focusables.nth(i);
+    const before = await target.evaluate(getPaint);
+    await target.focus();
+    const after = await target.evaluate(getPaint);
+    await target.evaluate(function (node) {
+      node.blur();
+    });
+
+    // Compare each element of the cell before and after focus
+    const colors = [];
+    let changed = false;
+    let browserRing = false;
+    after.parts.forEach(function (now, index) {
+      const was = before.parts[index];
+      const drawn = now.outlineStyle !== 'none' && parseFloat(now.outlineWidth) > 0;
+      browserRing = browserRing || (drawn && now.outlineStyle === 'auto');
+      if (drawn && (now.outlineStyle !== was.outlineStyle || now.outlineColor !== was.outlineColor || now.outlineWidth !== was.outlineWidth)) {
+        changed = true;
+        colors.push(now.outlineColor);
+      }
+      changed = changed || now.borderWidth !== was.borderWidth;
+      for (const key of ['borderColor', 'fill']) {
+        if (now[key] !== was[key] && !TRANSPARENT.test(now[key])) {
+          changed = true;
+          colors.push(now[key]);
+        }
+      }
+      const rings = getRingColors(was.shadow);
+      for (const color of getRingColors(now.shadow)) {
+        if (!rings.includes(color)) {
+          changed = true;
+          colors.push(color);
+        }
+      }
+    });
+    out.push({ state: before.state, colors: Array.from(new Set(colors)), changed: changed, browserRing: browserRing });
+  }
+  expect(errors).toEqual([]);
+
+  return out;
+
+}
+
+
 for (const profile of PROFILES) {
 
   test(profile + ' + acme: the three overridden glyphs are drawn', async function ({ page }) {
@@ -75,6 +224,11 @@ for (const profile of PROFILES) {
   test(profile + ' + acme: the family, focus color and radius reach every rendered component', async function ({ page }) {
     const reached = { texts: 0, focusables: 0, corners: 0 };
     const wrong = [];
+    const own = await getOwnFocusColors(page, profile);
+    const brand = [toRgb(ACME['color.focus']), toRgb(ACME['color.interactive'])];
+    expect(own.filter(function (color) {
+      return brand.includes(color);
+    }), 'the brand focus colors differ from the template\'s own').toEqual([]);
     for (const family of FAMILIES) {
       const errors = await openPage(page, '/showcase/' + family + '?profile=' + profile + '&brand=acme');
       await waitForFamily(page, family);
@@ -96,67 +250,6 @@ for (const profile of PROFILES) {
         return family + ': text still drawn in ' + familyName;
       }));
 
-      // Every enabled focusable part shows its focus in the brand's colors once focused. Each
-      // template draws focus its own way (an outline ring, a border with an inset ring, a field
-      // outline in the interactive color), so what is checked is every outline, border and shadow
-      // color focus adds in the cell: at least one, each the brand's focus or interactive color,
-      // or the page color a ring draws as its inner line; never the browser's own ring
-      const focusables = page.locator('[data-cell="true"] :is([role="button"], [role="checkbox"], [role="combobox"], input):not([aria-disabled="true"]):not([disabled])');
-      const count = await focusables.count();
-      const allowed = [toRgb(ACME['color.focus']), toRgb(ACME['color.interactive'])];
-      for (let i = 0; i < count; i++) {
-        const target = focusables.nth(i);
-        const paint = function (node) {
-          const cell = node.closest('[data-cell="true"]');
-          return Array.from(cell.querySelectorAll('*')).map(function (candidate) {
-            const style = window.getComputedStyle(candidate);
-            return {
-              outline: style.outlineStyle !== 'none' && parseFloat(style.outlineWidth) > 0 ? style.outlineColor : null,
-              border: style.borderTopColor,
-              shadow: style.boxShadow
-            };
-          });
-        };
-        const before = await target.evaluate(paint);
-        await target.focus();
-        const after = await target.evaluate(paint);
-        const pageColor = await target.evaluate(function (node) {
-          let current = node;
-          while (current) {
-            const background = window.getComputedStyle(current).backgroundColor;
-            if (background !== 'rgba(0, 0, 0, 0)' && background !== 'transparent') {
-              return background;
-            }
-            current = current.parentElement;
-          }
-          return 'rgb(255, 255, 255)';
-        });
-        const added = [];
-        after.forEach(function (style, index) {
-          const was = before[index] || {};
-          if (style.outline !== null && style.outline !== was.outline) {
-            added.push(style.outline);
-          }
-          if (style.border !== was.border && style.border !== 'rgba(0, 0, 0, 0)') {
-            added.push(style.border);
-          }
-          if (style.shadow !== was.shadow && style.shadow !== 'none') {
-            added.push.apply(added, (style.shadow.match(/rgba?\([^)]*\)/g) || []).filter(function (color) {
-              return !/, 0\)$/.test(color);
-            }));
-          }
-        });
-        reached.focusables += 1;
-        if (added.length === 0 || added.some(function (color) {
-          return !allowed.includes(color) && color !== pageColor;
-        })) {
-          wrong.push(family + ': focus drew ' + JSON.stringify(added));
-        }
-        await target.evaluate(function (node) {
-          node.blur();
-        });
-      }
-
       // A corner that names an overridden radius takes the brand's value
       const corners = await page.evaluate(function (radius) {
         return Array.from(document.querySelectorAll('[data-cell="true"][data-state="rounded"] [data-part="body"] > div')).map(function (node) {
@@ -174,6 +267,46 @@ for (const profile of PROFILES) {
         wrong.push(family + ': rounded corner not at the brand radius');
       }
       expect(errors).toEqual([]);
+
+      // Every enabled focusable part shows its focus, and where the template draws focus in its
+      // own focus or interactive color, the brand's color is drawn instead. Each template draws
+      // focus its own way (an outline ring, a border with an inset ring and a page-color line,
+      // a thicker field outline, a state color on the box), so the same parts are focused without
+      // the brand first: a color the template's focus draws there that is its own focus or
+      // interactive color must become the brand's. Focus never draws the browser's own ring
+      const unbranded = await getFocusDrawn(page, '/showcase/' + family + '?profile=' + profile, family);
+      const branded = await getFocusDrawn(page, '/showcase/' + family + '?profile=' + profile + '&brand=acme', family);
+      expect(branded.map(function (entry) {
+        return entry.state;
+      }), family + ': the same focusable parts with and without the brand').toEqual(unbranded.map(function (entry) {
+        return entry.state;
+      }));
+      branded.forEach(function (entry, index) {
+        const label = family + ' / ' + entry.state + ': ';
+        reached.focusables += entry.colors.some(function (color) {
+          return brand.includes(color);
+        }) ? 1 : 0;
+        if (!entry.changed) {
+          wrong.push(label + 'focus draws nothing');
+        }
+        if (entry.browserRing) {
+          wrong.push(label + 'focus draws the browser ring');
+        }
+        const leaked = entry.colors.filter(function (color) {
+          return own.includes(color);
+        });
+        if (leaked.length > 0) {
+          wrong.push(label + 'focus still draws the template color ' + JSON.stringify(leaked));
+        }
+        const expectsBrand = unbranded[index].colors.some(function (color) {
+          return own.includes(color);
+        });
+        if (expectsBrand && !entry.colors.some(function (color) {
+          return brand.includes(color);
+        })) {
+          wrong.push(label + 'focus draws ' + JSON.stringify(entry.colors) + ', not the brand color');
+        }
+      });
     }
     expect(wrong).toEqual([]);
 
