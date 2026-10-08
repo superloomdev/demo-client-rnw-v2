@@ -36,6 +36,8 @@ Always delete `node_modules` and `package-lock.json` before testing. Consumer re
 
 `@superloomdev/rnw-components` is `file:`-linked from the sibling `codebase-rnw-components-v2` until it is published at launch. It imports no framework: `src/app-core/loader.js` imports React, React Native and react-native-svg once and passes them to `createSystem` through `shared_libs` (`React`, `ReactNative`, `Svg`). Icons are theme tokens drawn by the library; there is no Icons host adapter.
 
+CI and the native gate check the library out at the ref named in `library.ref` (a branch, tag or SHA; the native gate's `library_ref` input overrides it). It names `main` except while a milestone branch depends on published theme packages `main` cannot use; the change that merges that branch sets it back to `main`. `npm run verify` refuses to run unless the sibling checkout is that ref as pushed, with a clean tree.
+
 Bundler requirements this imposes, both hosts:
 
 - `react-native` resolves to `react-native-web` on web; `.web.js` files resolve before `.js`.

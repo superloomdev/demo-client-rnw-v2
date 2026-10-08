@@ -7,3 +7,5 @@ name	Install root deps	clean install
 name	Install Playwright browsers	e2e	
 name	Run E2E	e2e	
 name	Expo web export	clean install,expo web export	
+name	Library ref	library ref	CI reads library.ref; verify checks the sibling checkout is that ref as pushed.
+name	Library commit checked out	library ref	

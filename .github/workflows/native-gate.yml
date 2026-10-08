@@ -15,10 +15,11 @@
 # Simulator evidence is simulator evidence; real devices are a later claim.
 #
 # The component library is file:-linked from its sibling repository, so
-# every job checks out both side by side. A milestone walks the library
-# branch it is about to merge (`library_ref`, e.g. wip/batch-1); a run on
-# `main` walks only what is already merged. Every job prints the library
-# commit it checked out, so the evidence names what was walked.
+# every job checks out both side by side. The library ref is the
+# `library_ref` input when given, otherwise the one named in `library.ref`
+# (the same pin CI uses), so a milestone tag walks what CI tested. Every job
+# prints the library commit it checked out, so the evidence names what was
+# walked.
 
 name: Native Gate
 
@@ -26,9 +27,9 @@ on:
   workflow_dispatch:
     inputs:
       library_ref:
-        description: Library branch, tag or SHA to walk
+        description: Library branch, tag or SHA to walk (empty walks library.ref)
         required: false
-        default: main
+        default: ''
   push:
     tags: ['milestone-*']
 
@@ -47,10 +48,19 @@ jobs:
       - uses: actions/checkout@v7
         with:
           path: codebase-demo-client-rnw-v2
+      - name: Library ref
+        id: library
+        env:
+          LIBRARY_REF_INPUT: ${{ inputs.library_ref }}
+        run: |
+          ref="$LIBRARY_REF_INPUT"
+          if [ -z "$ref" ]; then ref=$(tr -d '[:space:]' < codebase-demo-client-rnw-v2/library.ref); fi
+          if [ -z "$ref" ]; then echo "FAIL: no library ref"; exit 1; fi
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v7
         with:
           repository: superloomdev/rnw-components-v2
-          ref: ${{ inputs.library_ref || 'main' }}
+          ref: ${{ steps.library.outputs.ref }}
           path: codebase-rnw-components-v2
       - name: Library commit walked
         run: echo "library $(git -C codebase-rnw-components-v2 rev-parse HEAD) ($(git -C codebase-rnw-components-v2 rev-parse --abbrev-ref HEAD))"
@@ -86,10 +96,19 @@ jobs:
       - uses: actions/checkout@v7
         with:
           path: codebase-demo-client-rnw-v2
+      - name: Library ref
+        id: library
+        env:
+          LIBRARY_REF_INPUT: ${{ inputs.library_ref }}
+        run: |
+          ref="$LIBRARY_REF_INPUT"
+          if [ -z "$ref" ]; then ref=$(tr -d '[:space:]' < codebase-demo-client-rnw-v2/library.ref); fi
+          if [ -z "$ref" ]; then echo "FAIL: no library ref"; exit 1; fi
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v7
         with:
           repository: superloomdev/rnw-components-v2
-          ref: ${{ inputs.library_ref || 'main' }}
+          ref: ${{ steps.library.outputs.ref }}
           path: codebase-rnw-components-v2
       - name: Library commit walked
         run: echo "library $(git -C codebase-rnw-components-v2 rev-parse HEAD) ($(git -C codebase-rnw-components-v2 rev-parse --abbrev-ref HEAD))"
@@ -153,10 +172,19 @@ jobs:
       - uses: actions/checkout@v7
         with:
           path: codebase-demo-client-rnw-v2
+      - name: Library ref
+        id: library
+        env:
+          LIBRARY_REF_INPUT: ${{ inputs.library_ref }}
+        run: |
+          ref="$LIBRARY_REF_INPUT"
+          if [ -z "$ref" ]; then ref=$(tr -d '[:space:]' < codebase-demo-client-rnw-v2/library.ref); fi
+          if [ -z "$ref" ]; then echo "FAIL: no library ref"; exit 1; fi
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v7
         with:
           repository: superloomdev/rnw-components-v2
-          ref: ${{ inputs.library_ref || 'main' }}
+          ref: ${{ steps.library.outputs.ref }}
           path: codebase-rnw-components-v2
       - name: Library commit walked
         run: echo "library $(git -C codebase-rnw-components-v2 rev-parse HEAD) ($(git -C codebase-rnw-components-v2 rev-parse --abbrev-ref HEAD))"

@@ -8,7 +8,7 @@
 // The workflow stays the single source of truth for what a gate asserts.
 //
 // Usage:
-//   node scripts/verify.js           gates + clean installs (root, src/_test,
+//   node scripts/verify.js           gates + the library ref check + clean installs (root, src/_test,
 //                                    hosts/web, hosts/expo) + lint + unit tests +
 //                                    web build + Expo web export + e2e, then the
 //                                    parity assertion and the stamp
@@ -18,7 +18,7 @@
 //                                    still requires one full run
 
 import { execSync } from 'node:child_process';
-import { existsSync, readdirSync, renameSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -338,6 +338,33 @@ if (!GATES_ONLY) {
     }
     executed.push(name);
   };
+
+  // CI checks out the library at the ref `library.ref` names; the sibling
+  // checkout must be that ref as pushed, with a clean tree, or a local pass
+  // describes a different library commit than CI tests (pitfalls: local
+  // verify and CI tested different library commits)
+  phase('library ref', function () {
+    const ref = readFileSync(path.join(REPO_ROOT, 'library.ref'), 'utf8').trim();
+    const library = path.resolve(REPO_ROOT, '..', 'codebase-rnw-components-v2');
+    const git = function (args) {
+      return execSync('git ' + args, { cwd: library, encoding: 'utf8' }).trim();
+    };
+
+    // Resolve the ref as the remote has it: a branch by its pushed head
+    git('fetch --quiet origin');
+    const remote = 'refs/remotes/origin/' + ref;
+    const target = git('for-each-ref --format="%(refname)" ' + remote) === remote ? remote : ref;
+    const want = git('rev-parse --verify "' + target + '^{commit}"');
+    const head = git('rev-parse HEAD');
+    const dirty = git('status --porcelain');
+    process.stdout.write('library.ref ' + ref + ' = ' + want + '; sibling HEAD ' + head + '\n');
+
+    // Refuse a sibling that is elsewhere or carries uncommitted changes
+    if (head !== want || dirty !== '') {
+      process.stdout.write('FAIL: check out ' + ref + ' as pushed, with a clean tree, in ' + library + '\n');
+      throw new Error('library ref mismatch');
+    }
+  });
 
   phase('clean install', function () {
     for (const root of INSTALL_ROOTS) {
