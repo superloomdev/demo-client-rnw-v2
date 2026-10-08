@@ -26,6 +26,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import navigationAdapter from './adapters/navigation.js';
 import fontsAdapter from './adapters/fonts.js';
+import { isAppFocused } from '../../scripts/device-focus.js';
 
 const ADAPTERS = { Navigation: navigationAdapter, Fonts: fontsAdapter };
 const { Lib } = appLoader(ADAPTERS);
@@ -556,6 +557,27 @@ describe('walker report', function () {
       return font.role === 'font.family.sans';
     });
     assert.deepEqual(sans, { role: 'font.family.sans', family: 'Roboto', drawn: 'System', loaded: false });
+  });
+
+});
+
+
+describe('native-walk: the app holds focus before an Android screenshot', function () {
+
+  const APP = 'com.anonymous.nimbusrnwdemo';
+  const dump = function (focus) {
+    return 'WINDOW MANAGER WINDOWS (dumpsys window windows)\n  mFocusedApp=ActivityRecord{1 u0 ' + APP + '/.MainActivity t9}\n  mCurrentFocus=' + focus + '\n';
+  };
+
+  test('the app activity is focused', function () {
+    assert.equal(isAppFocused(dump('Window{4e2b3f1 u0 ' + APP + '/' + APP + '.MainActivity}'), APP), true);
+  });
+
+  test('another app\'s not-responding prompt, a prompt about the app, and no focus are not the app', function () {
+    assert.equal(isAppFocused(dump('Window{9c1d0a2 u0 Application Not Responding: com.google.android.apps.nexuslauncher}'), APP), false);
+    assert.equal(isAppFocused(dump('Window{9c1d0a2 u0 Application Not Responding: ' + APP + '}'), APP), false);
+    assert.equal(isAppFocused(dump('null'), APP), false);
+    assert.equal(isAppFocused('no focus line', APP), false);
   });
 
 });

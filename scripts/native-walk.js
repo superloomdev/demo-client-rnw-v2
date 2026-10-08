@@ -22,6 +22,7 @@ import { existsSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 import { catalog } from '../hosts/expo/node_modules/@superloomdev/rnw-components/catalog.js';
+import { isAppFocused } from './device-focus.js';
 
 const arg = function (flag, fallback) {
   const index = process.argv.indexOf(flag);
@@ -154,8 +155,34 @@ async function startWalk (theme, family) {
 }
 
 
+// Android screenshots taken while another window had focus
+const obscured = [];
+
+
 /********************************************************************
-Screenshot the booted device into a PNG file.
+Run an adb shell command the device may refuse; a refusal is not an
+error, because the focus check after it is what decides.
+
+@param {Array} args - Arguments after `adb shell`
+
+@return {undefined}
+*********************************************************************/
+function tryShell (args) {
+
+  try {
+    execFileSync('adb', ['shell'].concat(args), { stdio: 'ignore' });
+  } catch {
+    // Refused on this image: the focus check decides
+  }
+
+}
+
+
+/********************************************************************
+Screenshot the booted device into a PNG file. On Android the app must
+hold focus first: system dialogs are closed and focus is checked up to
+three times, and a screenshot of any other window is recorded as
+obscured (it is still written, so the evidence shows what covered it).
 
 @param {String} file - Output path
 
@@ -166,6 +193,17 @@ function screenshot (file) {
   if (PLATFORM === 'ios') {
     execFileSync('xcrun', ['simctl', 'io', 'booted', 'screenshot', file], { stdio: 'inherit' });
     return;
+  }
+
+  // Close whatever system dialog covers the app, then confirm the app has focus
+  let focused = false;
+  for (let attempt = 0; attempt < 3 && !focused; attempt++) {
+    tryShell(['am', 'broadcast', '-a', 'android.intent.action.CLOSE_SYSTEM_DIALOGS']);
+    execFileSync('sleep', ['1']);
+    focused = isAppFocused(execFileSync('adb', ['shell', 'dumpsys', 'window'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }), APP_ID);
+  }
+  if (!focused) {
+    obscured.push(file);
   }
   writeFileSync(file, execFileSync('adb', ['exec-out', 'screencap', '-p'], { maxBuffer: 64 * 1024 * 1024 }));
 
@@ -198,6 +236,12 @@ async function waitForFile (file, seconds) {
 
 
 const missing = [];
+
+// An emulator under load reports other apps as not responding; those
+// prompts take focus over the app, so they are switched off before walking
+if (PLATFORM === 'android') {
+  tryShell(['settings', 'put', 'global', 'hide_error_dialogs', '1']);
+}
 
 // Command mode: the app runs once and takes every command from the server
 if (MODE === 'command') {
@@ -233,6 +277,10 @@ for (const theme of THEMES) {
 
 if (missing.length > 0) {
   process.stderr.write('native-walk: no report within ' + TIMEOUT_S + 's for: ' + missing.join(', ') + '\n');
+  process.exit(1);
+}
+if (obscured.length > 0) {
+  process.stderr.write('native-walk: another window had focus for: ' + obscured.join(', ') + '\n');
   process.exit(1);
 }
 process.stdout.write('native-walk: ' + THEMES.length + ' reports, ' + (THEMES.length * FAMILIES.length) + ' family screenshots\n');
