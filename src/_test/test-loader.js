@@ -534,6 +534,15 @@ describe('walk-assert', function () {
     assert.equal(run(fixture('ios', { width: 20, height: 20 }), WEB), 1);
   });
 
+  test('a cell capped by its host reports the grid room, a collapsed cell still fails', function () {
+    const capped = fixture('ios', { width: 344, height: 88 });
+    capped.gridWidth = 370;
+    assert.equal(run(capped, fixture('web', { width: 600, height: 88 })), 0);
+    const collapsed = fixture('ios', { width: 200, height: 88 });
+    collapsed.gridWidth = 370;
+    assert.equal(run(collapsed, fixture('web', { width: 600, height: 88 })), 1);
+  });
+
   test('the sans and mono families must be drawn as named, natively and in the web baseline', function () {
     assert.equal(run(fixture('ios', { width: 100, height: 20 }, { mono: false }), WEB), 1);
     assert.equal(run(fixture('ios', { width: 100, height: 20 }), fixture('web', { width: 100, height: 20 }, { sans: false })), 1);
@@ -555,7 +564,7 @@ describe('walker report', function () {
       cells: [{ component: 'Icon', state: 'default', width: 20, height: 20 }],
       errors: []
     });
-    assert.deepEqual(Object.keys(report).sort(), ['brand', 'cells', 'components', 'errors', 'expectedCells', 'family', 'fonts', 'platform', 'schema', 'scheme', 'theme', 'tokens']);
+    assert.deepEqual(Object.keys(report).sort(), ['brand', 'cells', 'components', 'errors', 'expectedCells', 'family', 'fonts', 'gridWidth', 'platform', 'schema', 'scheme', 'theme', 'tokens']);
     assert.equal(report.expectedCells, Lib.Components.catalog.reduce(function (sum, entry) {
       return sum + entry.sample.length;
     }, 0));

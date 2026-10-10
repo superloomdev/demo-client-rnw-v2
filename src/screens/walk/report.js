@@ -19,6 +19,7 @@ Build the walker report.
 @param {Array}  input.cells     - [{ component, state, width, height }]
 @param {Array}  input.errors    - [{ component, state, message }]
 @param {String} [input.family]  - The walked family, when one was requested
+@param {Number} [input.gridWidth] - The measured width of the cells grid
 
 @return {Object} - The report
 *********************************************************************/
@@ -56,6 +57,7 @@ export function buildReport (input) {
     cells: input.cells,
     errors: input.errors,
     fonts: fonts,
+    gridWidth: input.gridWidth || 0,
     tokens: tokens
   };
 

@@ -61,9 +61,10 @@ function WalkerRun (props) {
     return sum + entry.sample.length;
   }, 0);
 
-  // Init the measurements, the errors and the send status
+  // Init the measurements, the errors, the grid room and the send status
   const cells = React.useRef({});
   const errors = React.useRef([]);
+  const grid = React.useRef(0);
   const [measured, setMeasured] = React.useState(0);
   const [status, setStatus] = React.useState('measuring');
 
@@ -82,7 +83,8 @@ function WalkerRun (props) {
       catalog: entries,
       cells: Object.values(cells.current),
       errors: errors.current,
-      family: props.family
+      family: props.family,
+      gridWidth: grid.current
     });
     globalThis.__walk = report;
 
@@ -107,10 +109,16 @@ function WalkerRun (props) {
 
   }, [measured, expected, status]);
 
+  // The grid's own width names the room a cell body gets: a component
+  // whose width is capped by its host reports it, never the token's
+  const onGridLayout = function (event) {
+    grid.current = event.nativeEvent.layout.width;
+  };
+
   // Render every cell, recording its layout and any error
   return React.createElement(ScrollView, { testID: 'walker', contentContainerStyle: { padding: 16, gap: 12 } },
     React.createElement(Text, { testID: 'walk-status' }, 'walk: ' + status + ' (' + measured + '/' + expected + ')'),
-    React.createElement(View, { style: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 } },
+    React.createElement(View, { onLayout: onGridLayout, style: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 } },
       entries.flatMap(function (entry) {
         return entry.sample.map(function (state) {
           const key = entry.name + '/' + state.label;
