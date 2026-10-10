@@ -30,8 +30,9 @@ function toRgb (hex) {
 }
 
 
-// The enabled focusable parts of a showcase page
-const FOCUSABLE = '[data-cell="true"] :is([role="button"], [role="checkbox"], [role="combobox"], input):not([aria-disabled="true"]):not([disabled])';
+// The enabled focusable parts of a showcase page, excluding parts a
+// template mounts but does not draw (a close seat a template hides)
+const FOCUSABLE = '[data-cell="true"] :is([role="button"], [role="checkbox"], [role="combobox"], input):not([aria-disabled="true"]):not([disabled]):visible';
 // A computed color with zero alpha
 const TRANSPARENT = /^rgba\(.*, 0\)$/;
 

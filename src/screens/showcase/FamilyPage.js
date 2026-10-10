@@ -45,7 +45,11 @@ export default function FamilyPage (props) {
     return React.createElement(View, { key: entry.name, style: { gap: 8 } },
       React.createElement(Text, { style: { fontSize: 16 } }, entry.name + ' - ' + entry.tier + ', ' + entry.platform),
       React.createElement(View, { style: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 } },
-        entry.sample.map(function (state) {
+        // A state the sample marks `cell: false` mounts in the unit gates
+        // but not the grids: its drawing escapes a cell by design
+        entry.sample.filter(function (state) {
+          return state.cell !== false;
+        }).map(function (state) {
           return React.createElement(SafeCell, { key: state.label, Component: ctx.Registry[entry.name], entry: entry, state: state });
         })));
   }));

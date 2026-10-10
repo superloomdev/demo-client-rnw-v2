@@ -66,7 +66,9 @@ export async function waitForFamily (page, family) {
   const expected = catalog.filter(function (entry) {
     return entry.family === family;
   }).reduce(function (sum, entry) {
-    return sum + entry.sample.length;
+    return sum + entry.sample.filter(function (state) {
+      return state.cell !== false;
+    }).length;
   }, 0);
   await expect(page.locator('[data-cell="true"]')).toHaveCount(expected, { timeout: 20000 });
 

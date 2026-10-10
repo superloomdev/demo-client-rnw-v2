@@ -73,10 +73,21 @@ export default function createSafeCell (Lib) {
       style: { padding: 12, borderWidth: 1, borderStyle: 'dashed', borderColor: '#c6c6c6', alignItems: 'flex-start', gap: 8 }
     },
     React.createElement(Text, { style: { fontSize: 11, color: '#6f6f6f' } }, props.entry.name + ' / ' + props.state.label),
-    // A component that fills its container is laid out in the frame its catalog entry names
-    React.createElement(View, { testID: 'body-' + id, dataSet: { part: 'body' }, onLayout: props.onLayout, style: props.entry.frame ? { width: props.entry.frame.width } : undefined },
-      React.createElement(Boundary, { onError: props.onError },
-        React.createElement(props.Component, props.state.props))));
+    // A component that fills its container is laid out in the frame its catalog entry names;
+    // a `stage` frame makes the body the containing block of a fixed layer, so an overlay
+    // component paints its layer inside the cell it was mounted in
+    React.createElement(View, {
+      testID: 'body-' + id,
+      dataSet: { part: 'body' },
+      onLayout: props.onLayout,
+      style: props.entry.frame ? {
+        height: props.entry.frame.height,
+        transform: props.entry.frame.stage === true ? [{ translateX: 0 }] : undefined,
+        width: props.entry.frame.width
+      } : undefined
+    },
+    React.createElement(Boundary, { onError: props.onError },
+      React.createElement(props.Component, props.state.props))));
 
   };
 

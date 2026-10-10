@@ -178,7 +178,9 @@ describe('showcase', function () {
       for (const group of getFamilies(Lib.Components.catalog)) {
         const renderer = await renderThemed(React.createElement(FamilyPage, { family: group.family }), { profile: profileName });
         const expected = group.components.reduce(function (sum, entry) {
-          return sum + entry.sample.length;
+          return sum + entry.sample.filter(function (state) {
+            return state.cell !== false;
+          }).length;
         }, 0);
         const ids = new Set(renderer.root.findAll(function (node) {
           return typeof node.type === 'string' && node.props['data-cell'] === 'true';
@@ -202,7 +204,12 @@ describe('showcase', function () {
       const body = renderer.root.findAll(function (node) {
         return typeof node.type === 'string' && node.props['data-testid'] === 'body-' + entry.name + '-' + entry.sample[0].label;
       })[0];
-      assert.deepEqual(body.props.style || null, entry.frame ? { width: entry.frame.width + 'px' } : null, entry.name);
+      assert.deepEqual(body.props.style || null, entry.frame ? Object.assign(
+        {},
+        entry.frame.height !== undefined ? { height: entry.frame.height + 'px' } : null,
+        entry.frame.stage === true ? { transform: 'translateX(0px)' } : null,
+        { width: entry.frame.width + 'px' }
+      ) : null, entry.name);
       await act(async function () {
         renderer.unmount();
       });
