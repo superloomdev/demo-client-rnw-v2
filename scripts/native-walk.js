@@ -258,11 +258,15 @@ function captureAndroidEvidence (theme) {
   } catch {
     writeFileSync(join(OUT, PLATFORM + '-' + theme + '-pid.txt'), 'not running\n');
   }
-  try {
-    const log = execFileSync('adb', ['logcat', '-d', '-t', '2000'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
-    writeFileSync(join(OUT, PLATFORM + '-' + theme + '-logcat.txt'), log);
-  } catch {
-    // No log access on this image: the pid and screenshot still answer
+  // The crash buffer holds only fatals; the system buffer names the process
+  // death; the error-only main tail keeps the JS trace over the GMS chatter
+  for (const capture of [['crash', []], ['system', ['ActivityManager:D', 'lowmemorykiller:D', 'DEBUG:D', '*:S']], ['main', ['*:E']]]) {
+    try {
+      const log = execFileSync('adb', ['logcat', '-d', '-b', capture[0], '-t', '8000'].concat(capture[1]), { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+      writeFileSync(join(OUT, PLATFORM + '-' + theme + '-logcat-' + capture[0] + '.txt'), log);
+    } catch {
+      // No log access on this image: the pid and screenshot still answer
+    }
   }
 
 }
