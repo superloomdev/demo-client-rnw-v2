@@ -237,6 +237,36 @@ async function waitForFile (file, seconds) {
 
 const missing = [];
 
+/********************************************************************
+Record why an Android walk produced no report: whether the app still
+runs (a pid answers crash versus hang or unreachable report host) and
+the device log, which carries the fatal JS trace on a silent Release
+crash. A refusal is not an error: the timeout still names the miss.
+
+@param {String} theme - Template the timed-out walk ran under
+
+@return {undefined}
+*********************************************************************/
+function captureAndroidEvidence (theme) {
+
+  if (PLATFORM !== 'android') {
+    return;
+  }
+  try {
+    const pid = execFileSync('adb', ['shell', 'pidof', APP_ID], { encoding: 'utf8' });
+    writeFileSync(join(OUT, PLATFORM + '-' + theme + '-pid.txt'), pid);
+  } catch {
+    writeFileSync(join(OUT, PLATFORM + '-' + theme + '-pid.txt'), 'not running\n');
+  }
+  try {
+    const log = execFileSync('adb', ['logcat', '-d', '-t', '2000'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+    writeFileSync(join(OUT, PLATFORM + '-' + theme + '-logcat.txt'), log);
+  } catch {
+    // No log access on this image: the pid and screenshot still answer
+  }
+
+}
+
 // An emulator under load reports other apps as not responding; those
 // prompts take focus over the app, so they are switched off before walking
 if (PLATFORM === 'android') {
@@ -261,6 +291,7 @@ for (const theme of THEMES) {
   if (!await waitForFile(report, TIMEOUT_S)) {
     missing.push(report);
     screenshot(join(OUT, PLATFORM + '-' + theme + '-TIMEOUT.png'));
+    captureAndroidEvidence(theme);
     continue;
   }
 
