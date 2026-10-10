@@ -225,7 +225,11 @@ jobs:
             mkdir -p walk-out
             node scripts/walk-server.js --port 8787 --out walk-out > walk-out/walk-server.log 2>&1 &
             sleep 3
-            node scripts/native-walk.js --platform android --out walk-out --report-host 10.0.2.2
+            if ! node scripts/native-walk.js --platform android --out walk-out --report-host 10.0.2.2; then
+              adb shell pidof com.anonymous.nimbusrnwdemo > walk-out/app-pid.txt 2>&1 || true
+              adb logcat -d -t 2000 > walk-out/logcat.txt 2>&1 || true
+              exit 1
+            fi
       - name: Assert the reports
         working-directory: codebase-demo-client-rnw-v2
         run: node scripts/walk-assert.js --platform android --dir walk-out --web ../web-walk
