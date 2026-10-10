@@ -13,7 +13,9 @@
 // One honest exception: a cell whose width is capped by its host (a toast
 // wider than the room the grid leaves a cell body) is expected to shrink to
 // that room, so its bound is min(web width, grid room), never the web width
-// alone.
+// alone. The shrink reflows the cell's content, and a wrap can only grow
+// the box, so a capped cell's height is floored at the web height rather
+// than pinned to it.
 //
 // Usage: node scripts/walk-assert.js --platform ios|android --dir <dir>
 //          [--web <dir>] [--themes default,carbon,material]
@@ -111,9 +113,14 @@ for (const theme of THEMES) {
       const key = cell.component + '/' + cell.state;
       const other = webCells[key];
       const bound = other === undefined || room === 0 ? (other ? other.width : 0) : Math.min(other.width, room);
+      // A cell the host shrank reflows: wrapping can only grow its height,
+      // never shrink it below the unconstrained web box
+      const capped = other !== undefined && bound < other.width;
+      const heightOk = other !== undefined && (capped
+        ? cell.height >= other.height - TOLERANCE
+        : Math.abs(cell.height - other.height) <= TOLERANCE);
       const ok = other !== undefined && cell.width >= bound - WIDTH_TOLERANCE &&
-        cell.width <= other.width + WIDTH_TOLERANCE &&
-        Math.abs(cell.height - other.height) <= TOLERANCE;
+        cell.width <= other.width + WIDTH_TOLERANCE && heightOk;
       check(ok, theme + ': ' + key + ' ' + cell.width + 'x' + cell.height + ' vs web ' + (other ? other.width + 'x' + other.height : 'missing'));
     }
   }

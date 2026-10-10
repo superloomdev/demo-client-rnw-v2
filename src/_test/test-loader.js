@@ -543,6 +543,15 @@ describe('walk-assert', function () {
     assert.equal(run(collapsed, fixture('web', { width: 600, height: 88 })), 1);
   });
 
+  test('a capped cell may grow taller as its content wraps, never shorter', function () {
+    const wrapped = fixture('ios', { width: 344, height: 120 });
+    wrapped.gridWidth = 370;
+    assert.equal(run(wrapped, fixture('web', { width: 600, height: 88 })), 0);
+    const shrunk = fixture('ios', { width: 344, height: 86 });
+    shrunk.gridWidth = 370;
+    assert.equal(run(shrunk, fixture('web', { width: 600, height: 88 })), 1);
+  });
+
   test('the sans and mono families must be drawn as named, natively and in the web baseline', function () {
     assert.equal(run(fixture('ios', { width: 100, height: 20 }, { mono: false }), WEB), 1);
     assert.equal(run(fixture('ios', { width: 100, height: 20 }), fixture('web', { width: 100, height: 20 }, { sans: false })), 1);
