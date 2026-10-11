@@ -143,7 +143,7 @@ const ThemeContext = {
       layers: layers,
       platform: THEME_PLATFORM,
       transform: transform
-    }, props.children);
+    }, React.createElement(RootHost, null, props.children));
 
   },
 
@@ -179,3 +179,27 @@ const ThemeContext = {
 
 
 };/////////////////////////// Public Functions END //////////////////////////////
+
+
+/********************************************************************
+Root overlay host. Sits inside the extension's provider so it can read
+the built registry: when it carries an OverlayHost, the whole app is its
+child and every overlay renders its layers through the host, on every
+platform. An older registry without the component passes children
+through untouched.
+
+@param {Object} props - React props
+
+@return {Object} - React element
+*********************************************************************/
+function RootHost (props) {
+
+  // Read the controller; a registry with an OverlayHost mounts it at the root
+  const ctx = Ext.useThemeController();
+  const Host = ctx && ctx.Registry ? ctx.Registry.OverlayHost : undefined;
+
+  return Host === undefined
+    ? props.children
+    : React.createElement(Host, null, props.children);
+
+}

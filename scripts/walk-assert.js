@@ -13,7 +13,8 @@
 // One honest exception: a cell whose width is capped by its host (a toast
 // wider than the room the grid leaves a cell body) is expected to shrink to
 // that room, so its bound is min(web width, grid room), never the web width
-// alone. The shrink reflows the cell's content, and a wrap can only grow
+// alone - the room is the report's own gridWidth minus the cellChrome it
+// carries. The shrink reflows the cell's content, and a wrap can only grow
 // the box, so a capped cell's height is floored at the web height rather
 // than pinned to it.
 //
@@ -34,9 +35,6 @@ const WEB = arg('--web', null);
 const THEMES = arg('--themes', 'default,carbon,material').split(',');
 const TOLERANCE = 1;
 const WIDTH_TOLERANCE = 2;
-// The room a cell's chrome leaves its body: the cell border twice plus its
-// padding twice
-const CELL_CHROME = 26;
 // Font roles whose family must be drawn as named; the others are reported
 const REQUIRED_FONTS = ['font.family.sans', 'font.family.mono'];
 
@@ -106,9 +104,13 @@ for (const theme of THEMES) {
     for (const cell of web.cells) {
       webCells[cell.component + '/' + cell.state] = cell;
     }
-    // The widest a cell body can be on this device: a wider measure means
-    // the component was capped by its host, not collapsed
-    const room = report.gridWidth > 0 ? report.gridWidth - CELL_CHROME : 0;
+    // The widest a cell body can be on this device: the grid's width minus
+    // the chrome the report itself carries. A wider measure means the
+    // component was capped by its host, not collapsed
+    if (report.gridWidth > 0) {
+      check(Number.isFinite(report.cellChrome), theme + ': report carries no cellChrome');
+    }
+    const room = report.gridWidth > 0 ? report.gridWidth - report.cellChrome : 0;
     for (const cell of report.cells) {
       const key = cell.component + '/' + cell.state;
       const other = webCells[key];
@@ -120,7 +122,7 @@ for (const theme of THEMES) {
         ? cell.height >= other.height - TOLERANCE
         : Math.abs(cell.height - other.height) <= TOLERANCE);
       const ok = other !== undefined && cell.width >= bound - WIDTH_TOLERANCE &&
-        cell.width <= other.width + WIDTH_TOLERANCE && heightOk;
+        cell.width <= bound + WIDTH_TOLERANCE && heightOk;
       check(ok, theme + ': ' + key + ' ' + cell.width + 'x' + cell.height + ' vs web ' + (other ? other.width + 'x' + other.height : 'missing'));
     }
   }

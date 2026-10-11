@@ -144,6 +144,28 @@ async function renderThemed (element, theme) {
 
 describe('showcase', function () {
 
+  /********************************************************************
+  Fire every cell grid's onLayout (its cells render once the room is
+  known), as a native layout pass would. The width is generous so a
+  capped cell's bound is its own frame, not the room.
+
+  @param {Object} renderer - Test renderer
+
+  @return {Promise<void>}
+  *********************************************************************/
+  async function layOutGrids (renderer) {
+
+    const grids = renderer.root.findAll(function (node) {
+      return node.props.testID === 'cell-grid' && typeof node.props.onLayout === 'function';
+    });
+    await act(async function () {
+      for (const grid of grids) {
+        grid.props.onLayout({ nativeEvent: { layout: { width: 2000, height: 40 } } });
+      }
+    });
+
+  }
+
   test('the catalog groups into families in roster order', function () {
     const families = getFamilies(Lib.Components.catalog);
     assert.ok(families.length >= 1);
@@ -182,6 +204,7 @@ describe('showcase', function () {
             return state.cell !== false;
           }).length;
         }, 0);
+        await layOutGrids(renderer);
         const ids = new Set(renderer.root.findAll(function (node) {
           return typeof node.type === 'string' && node.props['data-cell'] === 'true';
         }).map(function (node) {
@@ -201,6 +224,7 @@ describe('showcase', function () {
   test('a component whose catalog entry names a frame is laid out in it; every other cell body shrinks to its content', async function () {
     for (const entry of Lib.Components.catalog) {
       const renderer = await renderThemed(React.createElement(FamilyPage, { family: entry.family }), { profile: 'carbon' });
+      await layOutGrids(renderer);
       const body = renderer.root.findAll(function (node) {
         return typeof node.type === 'string' && node.props['data-testid'] === 'body-' + entry.name + '-' + entry.sample[0].label;
       })[0];
@@ -277,13 +301,23 @@ describe('acme brand', function () {
 describe('walker', function () {
 
   /********************************************************************
-  Fire every cell's onLayout, as a native layout pass would.
+  Fire the grid's onLayout first (the cells render once its room is
+  known), then every cell's onLayout, as a native layout pass would.
 
   @param {Object} renderer - Test renderer
 
   @return {Promise<Number>} - Cells laid out
   *********************************************************************/
   async function layOut (renderer) {
+
+    const grids = renderer.root.findAll(function (node) {
+      return node.props.testID === 'walk-grid' && typeof node.props.onLayout === 'function';
+    });
+    await act(async function () {
+      for (const grid of grids) {
+        grid.props.onLayout({ nativeEvent: { layout: { width: 400, height: 40 } } });
+      }
+    });
 
     const bodies = renderer.root.findAll(function (node) {
       return typeof node.props.testID === 'string' && node.props.testID.indexOf('body-') === 0 && typeof node.props.onLayout === 'function';
@@ -390,6 +424,15 @@ describe('autopilot', function () {
         assert.ok(texts(renderer.toJSON()).some(function (line) {
           return line.indexOf('autopilot: ' + next.theme + ' / ' + (next.family || 'all')) === 0;
         }), texts(renderer.toJSON()).join(' | '));
+        // The cells render once the grid reports its room
+        const grids = renderer.root.findAll(function (node) {
+          return node.props.testID === 'walk-grid' && typeof node.props.onLayout === 'function';
+        });
+        await act(async function () {
+          for (const grid of grids) {
+            grid.props.onLayout({ nativeEvent: { layout: { width: 400, height: 40 } } });
+          }
+        });
         const bodies = renderer.root.findAll(function (node) {
           return typeof node.props.testID === 'string' && node.props.testID.indexOf('body-') === 0 && typeof node.props.onLayout === 'function';
         }).filter(function (node, index, all) {
@@ -489,6 +532,7 @@ describe('walk-assert', function () {
       theme: 'default',
       errors: [],
       expectedCells: 1,
+      cellChrome: 26,
       cells: [{ component: 'Button', state: 'default', width: cell.width, height: cell.height }],
       fonts: [
         { role: 'font.family.mono', family: 'Mono', drawn: drawn.mono ? 'Mono' : 'System', loaded: drawn.mono },
@@ -552,6 +596,19 @@ describe('walk-assert', function () {
     assert.equal(run(shrunk, fixture('web', { width: 600, height: 88 })), 1);
   });
 
+  test('a capped cell wider than its bound plus the margin fails', function () {
+    const wide = fixture('ios', { width: 347, height: 88 });
+    wide.gridWidth = 370;
+    assert.equal(run(wide, fixture('web', { width: 600, height: 88 })), 1);
+  });
+
+  test('a report with a grid width but no cellChrome fails', function () {
+    const report = fixture('ios', { width: 100, height: 20 });
+    report.gridWidth = 370;
+    delete report.cellChrome;
+    assert.equal(run(report, WEB), 1);
+  });
+
   test('the sans and mono families must be drawn as named, natively and in the web baseline', function () {
     assert.equal(run(fixture('ios', { width: 100, height: 20 }, { mono: false }), WEB), 1);
     assert.equal(run(fixture('ios', { width: 100, height: 20 }), fixture('web', { width: 100, height: 20 }, { sans: false })), 1);
@@ -573,7 +630,7 @@ describe('walker report', function () {
       cells: [{ component: 'Icon', state: 'default', width: 20, height: 20 }],
       errors: []
     });
-    assert.deepEqual(Object.keys(report).sort(), ['brand', 'cells', 'components', 'errors', 'expectedCells', 'family', 'fonts', 'gridWidth', 'platform', 'schema', 'scheme', 'theme', 'tokens']);
+    assert.deepEqual(Object.keys(report).sort(), ['brand', 'cellChrome', 'cells', 'components', 'errors', 'expectedCells', 'family', 'fonts', 'gridWidth', 'platform', 'schema', 'scheme', 'theme', 'tokens']);
     assert.equal(report.expectedCells, Lib.Components.catalog.reduce(function (sum, entry) {
       return sum + entry.sample.length;
     }, 0));

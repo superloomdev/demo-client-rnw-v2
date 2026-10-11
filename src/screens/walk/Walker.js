@@ -7,6 +7,7 @@
 // on `globalThis.__walk` for the e2e tests.
 import { useLib } from '../../app-core/contexts/lib-context.js';
 import createSafeCell from '../showcase/SafeCell.js';
+import { CELL_CHROME } from '../showcase/cell-chrome.js';
 import { buildReport } from './report.js';
 
 
@@ -61,10 +62,13 @@ function WalkerRun (props) {
     return sum + entry.sample.length;
   }, 0);
 
-  // Init the measurements, the errors, the grid room and the send status
+  // Init the measurements, the errors, the grid room and the send status.
+  // The room is state, not a ref: the cells render only once it is known,
+  // so no cell measures before its room is fixed and the report cannot
+  // race a relayout
   const cells = React.useRef({});
   const errors = React.useRef([]);
-  const grid = React.useRef(0);
+  const [gridWidth, setGridWidth] = React.useState(0);
   const [measured, setMeasured] = React.useState(0);
   const [status, setStatus] = React.useState('measuring');
 
@@ -84,7 +88,7 @@ function WalkerRun (props) {
       cells: Object.values(cells.current),
       errors: errors.current,
       family: props.family,
-      gridWidth: grid.current
+      gridWidth: gridWidth
     });
     globalThis.__walk = report;
 
@@ -112,14 +116,17 @@ function WalkerRun (props) {
   // The grid's own width names the room a cell body gets: a component
   // whose width is capped by its host reports it, never the token's
   const onGridLayout = function (event) {
-    grid.current = event.nativeEvent.layout.width;
+    const width = event.nativeEvent.layout.width;
+    if (width > 0 && width !== gridWidth) {
+      setGridWidth(width);
+    }
   };
 
-  // Render every cell, recording its layout and any error
+  // Render every cell once the room is known, recording its layout and any error
   return React.createElement(ScrollView, { testID: 'walker', contentContainerStyle: { padding: 16, gap: 12 } },
     React.createElement(Text, { testID: 'walk-status' }, 'walk: ' + status + ' (' + measured + '/' + expected + ')'),
-    React.createElement(View, { onLayout: onGridLayout, style: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 } },
-      entries.flatMap(function (entry) {
+    React.createElement(View, { testID: 'walk-grid', onLayout: onGridLayout, style: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 } },
+      gridWidth > 0 ? entries.flatMap(function (entry) {
         return entry.sample.map(function (state) {
           const key = entry.name + '/' + state.label;
           return React.createElement(SafeCell, {
@@ -127,6 +134,8 @@ function WalkerRun (props) {
             Component: ctx.Registry[entry.name],
             entry: entry,
             state: state,
+            Host: ctx.Registry.OverlayHost,
+            room: gridWidth - CELL_CHROME,
             onLayout: function (event) {
               const first = cells.current[key] === undefined;
               cells.current[key] = {
@@ -146,6 +155,6 @@ function WalkerRun (props) {
             }
           });
         });
-      })));
+      }) : null));
 
 }

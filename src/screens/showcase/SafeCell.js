@@ -3,6 +3,7 @@
 // error in place and reports it, while every other cell still renders.
 // Cells carry `dataSet` (component, state, family) so the web gates can
 // find them; on native the same values are in the testID.
+import { CELL_PADDING, CELL_BORDER } from './cell-chrome.js';
 
 
 /********************************************************************
@@ -56,6 +57,8 @@ export default function createSafeCell (Lib) {
   @param {Object}   props.Component - The registry component
   @param {Object}   props.entry     - Catalog entry
   @param {Object}   props.state     - One sample state { label, props }
+  @param {Function} [props.Host]    - The registry's OverlayHost
+  @param {Number}   [props.room]    - The width a cell body may take
   @param {Function} [props.onLayout] - Layout callback for the body
   @param {Function} [props.onError]  - Error callback
 
@@ -66,15 +69,26 @@ export default function createSafeCell (Lib) {
     // Init the identifiers the gates read
     const id = props.entry.name + '-' + props.state.label;
 
+    // The guarded component. A `stage` frame's cell hosts it locally too:
+    // an overlay (Menu, Modal) keeps its layer inside its own cell on every
+    // platform, the way the web stage transform already does
+    const guarded = React.createElement(Boundary, { onError: props.onError },
+      React.createElement(props.Component, props.state.props));
+    const staged = props.entry.frame && props.entry.frame.stage === true && props.Host;
+    const content = staged
+      ? React.createElement(props.Host, null, guarded)
+      : guarded;
+
     // Render the frame, the label and the guarded component
     return React.createElement(View, {
       testID: 'cell-' + id,
       dataSet: { cell: 'true', component: props.entry.name, state: props.state.label, family: props.entry.family },
-      style: { padding: 12, borderWidth: 1, borderStyle: 'dashed', borderColor: '#c6c6c6', alignItems: 'flex-start', gap: 8 }
+      style: { padding: CELL_PADDING, borderWidth: CELL_BORDER, borderStyle: 'dashed', borderColor: '#c6c6c6', alignItems: 'flex-start', gap: 8 }
     },
     React.createElement(Text, { style: { fontSize: 11, color: '#6f6f6f' } }, props.entry.name + ' / ' + props.state.label),
-    // A component that fills its container is laid out in the frame its catalog entry names;
-    // a `stage` frame makes the body the containing block of a fixed layer, so an overlay
+    // A component that fills its container is laid out in the frame its catalog entry names,
+    // capped at the room the grid reports: a stage wider than the body would run off-screen.
+    // A `stage` frame makes the body the containing block of a fixed layer, so an overlay
     // component paints its layer inside the cell it was mounted in
     React.createElement(View, {
       testID: 'body-' + id,
@@ -83,11 +97,9 @@ export default function createSafeCell (Lib) {
       style: props.entry.frame ? {
         height: props.entry.frame.height,
         transform: props.entry.frame.stage === true ? [{ translateX: 0 }] : undefined,
-        width: props.entry.frame.width
+        width: props.room > 0 ? Math.min(props.entry.frame.width, props.room) : props.entry.frame.width
       } : undefined
-    },
-    React.createElement(Boundary, { onError: props.onError },
-      React.createElement(props.Component, props.state.props))));
+    }, content));
 
   };
 

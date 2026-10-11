@@ -2,6 +2,7 @@
 // measured cells so the native gate compares identical fields on iOS,
 // Android and web. No framework is read here, so the Node test host can
 // assert the shape directly.
+import { CELL_CHROME } from '../showcase/cell-chrome.js';
 
 
 // A small token sample the report carries so a brand layer's reach is
@@ -58,6 +59,7 @@ export function buildReport (input) {
     errors: input.errors,
     fonts: fonts,
     gridWidth: input.gridWidth || 0,
+    cellChrome: CELL_CHROME,
     tokens: tokens
   };
 

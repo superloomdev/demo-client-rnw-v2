@@ -107,7 +107,9 @@ export async function getA11yTrees (page) {
           return child.textContent.trim();
         }).filter(Boolean).join(' ');
         if (text) {
-          parts.push('text=' + JSON.stringify(text));
+          // Whitespace is compared empty-handed: a theme's format choice
+          // may space a run without changing what it says
+          parts.push('text=' + JSON.stringify(text.replace(/\s/g, '')));
         }
         lines.push('  '.repeat(depth) + parts.join(' '));
         if (node.tagName.toLowerCase() === 'svg') {
