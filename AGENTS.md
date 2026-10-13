@@ -47,7 +47,7 @@ Bundler requirements this imposes, both hosts:
 
 ## Hooks
 
-`git config core.hooksPath .githooks` is set in this clone. `pre-commit` runs the workspace tier guard; `pre-push` refuses a push to `main` unless `.verify-stamp` matches the current content (a full `npm run verify` since the last edit). Pushes to `wip/*` are not gated.
+`git config core.hooksPath .githooks` is set in this clone. `pre-push` refuses a push to `main` unless `.verify-stamp` matches the current content (a full `npm run verify` since the last edit). Pushes to `wip/*` are not gated.
 
 ## Conventional Commits
 
