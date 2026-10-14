@@ -1,7 +1,9 @@
 # Native gate: the walker on an iOS simulator and an Android emulator.
 #
-# 1. web-walk runs the web walker (the e2e walker spec) and uploads its
-#    reports: the reference numbers native geometry is compared against.
+# 1. web-walk runs the web walker (the e2e walker spec) once per native
+#    platform, at that platform's own grid width, and uploads both report
+#    sets: a cell capped by its host re-lays out with the room, so the
+#    reference must have seen the same room to compare like with like.
 # 2. ios and android build the Expo app in Release, start the walk server and
 #    walk every template (scripts/native-walk.js): Android by deep link,
 #    nimbus://walk?theme=<t>&report=<url> from a stopped app (cold) and
@@ -73,17 +75,40 @@ jobs:
         run: |
           npm ci
           npx vite build
-      - name: Run the web walker
+      - name: Install web walker
         working-directory: codebase-demo-client-rnw-v2
         run: |
           npm ci
           npx playwright install --with-deps chromium
+      # The iOS simulator's grid reports 370 and the Android emulator's 288;
+      # the walker's scroll padding (16 a side) sits between the viewport
+      # and the grid width the report names. walk-assert fails the run when
+      # the two grid widths differ, so a changed room cannot compare silently
+      - name: Run the web walker at the iOS room
+        working-directory: codebase-demo-client-rnw-v2
+        env:
+          WALK_VIEWPORT: '402'
+        run: |
           npx playwright test e2e/walker.spec.js
-      - name: Upload web reports
+          mv test-results/walk test-results/walk-ios
+      - name: Run the web walker at the Android room
+        working-directory: codebase-demo-client-rnw-v2
+        env:
+          WALK_VIEWPORT: '320'
+        run: |
+          npx playwright test e2e/walker.spec.js
+          mv test-results/walk test-results/walk-android
+      - name: Upload web reports (iOS room)
         uses: actions/upload-artifact@v7
         with:
-          name: web-walk
-          path: codebase-demo-client-rnw-v2/test-results/walk/
+          name: web-walk-ios
+          path: codebase-demo-client-rnw-v2/test-results/walk-ios/
+          retention-days: 14
+      - name: Upload web reports (Android room)
+        uses: actions/upload-artifact@v7
+        with:
+          name: web-walk-android
+          path: codebase-demo-client-rnw-v2/test-results/walk-android/
           retention-days: 14
 
   ios:
@@ -116,11 +141,11 @@ jobs:
         with:
           node-version: '24'
           registry-url: 'https://npm.pkg.github.com'
-      - name: Download web reports
+      - name: Download web reports (iOS room)
         uses: actions/download-artifact@v8
         with:
-          name: web-walk
-          path: web-walk
+          name: web-walk-ios
+          path: web-walk-ios
       - name: Cache Pods
         uses: actions/cache@v6
         with:
@@ -152,7 +177,7 @@ jobs:
           node scripts/native-walk.js --platform ios --out walk-out --mode command
       - name: Assert the reports
         working-directory: codebase-demo-client-rnw-v2
-        run: node scripts/walk-assert.js --platform ios --dir walk-out --web ../web-walk
+        run: node scripts/walk-assert.js --platform ios --dir walk-out --web ../web-walk-ios
       - name: Upload iOS evidence
         if: always()
         uses: actions/upload-artifact@v7
@@ -196,11 +221,11 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Download web reports
+      - name: Download web reports (Android room)
         uses: actions/download-artifact@v8
         with:
-          name: web-walk
-          path: web-walk
+          name: web-walk-android
+          path: web-walk-android
       - name: Install, prebuild and assemble Release
         working-directory: codebase-demo-client-rnw-v2/hosts/expo
         run: |
@@ -228,7 +253,7 @@ jobs:
             node scripts/native-walk.js --platform android --out walk-out --report-host 10.0.2.2
       - name: Assert the reports
         working-directory: codebase-demo-client-rnw-v2
-        run: node scripts/walk-assert.js --platform android --dir walk-out --web ../web-walk
+        run: node scripts/walk-assert.js --platform android --dir walk-out --web ../web-walk-android
       - name: Upload Android evidence
         if: always()
         uses: actions/upload-artifact@v7

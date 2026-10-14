@@ -8,6 +8,18 @@ import { join } from 'node:path';
 
 import { PROFILES, catalog, openPage } from './helpers/showcase.js';
 
+// The native gate's web baseline must see the same room a device's grid
+// leaves a cell: WALK_VIEWPORT reruns this spec at that viewport width. The
+// walker's scroll padding sits between the viewport and the grid width the
+// report names, and walk-assert fails the run when the two differ, so the
+// workflow names the viewport, not the grid width
+const WALK_VIEWPORT = process.env.WALK_VIEWPORT
+  ? { width: Number(process.env.WALK_VIEWPORT), height: 720 }
+  : null;
+if (WALK_VIEWPORT) {
+  test.use({ viewport: WALK_VIEWPORT });
+}
+
 const WALK_OUT = join(process.cwd(), 'test-results', 'walk');
 const EXPECTED_CELLS = catalog.reduce(function (sum, entry) {
   return sum + entry.sample.filter(function (state) {

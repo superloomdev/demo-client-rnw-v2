@@ -536,6 +536,7 @@ describe('walk-assert', function () {
       theme: 'default',
       errors: [],
       expectedCells: 1,
+      gridWidth: 370,
       cellChrome: 26,
       cells: [{ component: 'Button', state: 'default', width: cell.width, height: cell.height }],
       fonts: [
@@ -553,7 +554,7 @@ describe('walk-assert', function () {
   @param {Object} native - Native report
   @param {Object} web    - Web report
 
-  @return {Number} - Exit status
+  @return {Object} - { status, out }
   *********************************************************************/
   function run (native, web) {
 
@@ -561,7 +562,8 @@ describe('walk-assert', function () {
     try {
       writeFileSync(join(dir, 'ios-default.json'), JSON.stringify(native));
       writeFileSync(join(dir, 'web-default.json'), JSON.stringify(web));
-      return spawnSync('node', [SCRIPT, '--platform', 'ios', '--dir', dir, '--web', dir, '--themes', 'default'], { stdio: 'pipe' }).status;
+      const result = spawnSync('node', [SCRIPT, '--platform', 'ios', '--dir', dir, '--web', dir, '--themes', 'default'], { stdio: 'pipe' });
+      return { status: result.status, out: String(result.stdout) };
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -571,51 +573,42 @@ describe('walk-assert', function () {
   const WEB = fixture('web', { width: 100, height: 20 });
 
   test('widths agree within two points (one pixel rounding per platform), heights within one', function () {
-    assert.equal(run(fixture('ios', { width: 101.67, height: 20.8 }), WEB), 0);
-    assert.equal(run(fixture('ios', { width: 98, height: 20 }), WEB), 0);
-    assert.equal(run(fixture('ios', { width: 102.5, height: 20 }), WEB), 1);
-    assert.equal(run(fixture('ios', { width: 100, height: 22 }), WEB), 1);
+    assert.equal(run(fixture('ios', { width: 101.67, height: 20.8 }), WEB).status, 0);
+    assert.equal(run(fixture('ios', { width: 98, height: 20 }), WEB).status, 0);
+    assert.equal(run(fixture('ios', { width: 102.5, height: 20 }), WEB).status, 1);
+    assert.equal(run(fixture('ios', { width: 100, height: 22 }), WEB).status, 1);
   });
 
   test('a face that was not drawn (a few points on a label) and a collapsed field both fail', function () {
-    assert.equal(run(fixture('ios', { width: 104, height: 20 }), WEB), 1);
-    assert.equal(run(fixture('ios', { width: 20, height: 20 }), WEB), 1);
+    assert.equal(run(fixture('ios', { width: 104, height: 20 }), WEB).status, 1);
+    assert.equal(run(fixture('ios', { width: 20, height: 20 }), WEB).status, 1);
   });
 
-  test('a cell capped by its host reports the grid room, a collapsed cell still fails', function () {
-    const capped = fixture('ios', { width: 344, height: 88 });
-    capped.gridWidth = 370;
-    assert.equal(run(capped, fixture('web', { width: 600, height: 88 })), 0);
-    const collapsed = fixture('ios', { width: 200, height: 88 });
-    collapsed.gridWidth = 370;
-    assert.equal(run(collapsed, fixture('web', { width: 600, height: 88 })), 1);
+  test('a web baseline walked at another grid width fails the run before any cell is read', function () {
+    const wide = fixture('web', { width: 100, height: 20 });
+    wide.gridWidth = 1248;
+    const result = run(fixture('ios', { width: 100, height: 20 }), wide);
+    assert.equal(result.status, 1);
+    assert.match(result.out, /web gridWidth 1248 != native 370: not the same room/);
+    assert.doesNotMatch(result.out, /Button\/default \d/);
   });
 
-  test('a capped cell may grow taller as its content wraps, never shorter', function () {
-    const wrapped = fixture('ios', { width: 344, height: 120 });
-    wrapped.gridWidth = 370;
-    assert.equal(run(wrapped, fixture('web', { width: 600, height: 88 })), 0);
-    const shrunk = fixture('ios', { width: 344, height: 86 });
-    shrunk.gridWidth = 370;
-    assert.equal(run(shrunk, fixture('web', { width: 600, height: 88 })), 1);
-  });
-
-  test('a capped cell wider than its bound plus the margin fails', function () {
-    const wide = fixture('ios', { width: 347, height: 88 });
-    wide.gridWidth = 370;
-    assert.equal(run(wide, fixture('web', { width: 600, height: 88 })), 1);
-  });
-
-  test('a report with a grid width but no cellChrome fails', function () {
-    const report = fixture('ios', { width: 100, height: 20 });
-    report.gridWidth = 370;
-    delete report.cellChrome;
-    assert.equal(run(report, WEB), 1);
+  test('a cell that shrank with its host matches a web cell that shrank the same way', function () {
+    // An AspectRatio-like cell: the web reference at the native room already
+    // holds the shrunk box, so like compares to like
+    const web = fixture('web', { width: 262, height: 147 });
+    web.gridWidth = 288;
+    const native = fixture('ios', { width: 262.5, height: 147.6 });
+    native.gridWidth = 288;
+    assert.equal(run(native, web).status, 0);
+    const tall = fixture('ios', { width: 262, height: 180 });
+    tall.gridWidth = 288;
+    assert.equal(run(tall, web).status, 1);
   });
 
   test('the sans and mono families must be drawn as named, natively and in the web baseline', function () {
-    assert.equal(run(fixture('ios', { width: 100, height: 20 }, { mono: false }), WEB), 1);
-    assert.equal(run(fixture('ios', { width: 100, height: 20 }), fixture('web', { width: 100, height: 20 }, { sans: false })), 1);
+    assert.equal(run(fixture('ios', { width: 100, height: 20 }, { mono: false }), WEB).status, 1);
+    assert.equal(run(fixture('ios', { width: 100, height: 20 }), fixture('web', { width: 100, height: 20 }, { sans: false })).status, 1);
   });
 
 });

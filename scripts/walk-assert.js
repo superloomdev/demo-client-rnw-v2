@@ -10,13 +10,10 @@
 // because each platform rounds a text run up to its own pixel grid (the web
 // and Android to whole points, iOS to thirds) once per side. A face that is
 // not drawn moves a label by several points, a collapsed field by a hundred.
-// One honest exception: a cell whose width is capped by its host (a toast
-// wider than the room the grid leaves a cell body) is expected to shrink to
-// that room, so its bound is min(web width, grid room), never the web width
-// alone - the room is the report's own gridWidth minus the cellChrome it
-// carries. The shrink reflows the cell's content, and a wrap can only grow
-// the box, so a capped cell's height is floored at the web height rather
-// than pinned to it.
+// The web baseline is walked at each platform's own grid width: a cell whose
+// width is capped by its host re-lays out with the room, so the reference
+// must have seen the same room - a grid-width mismatch fails before any
+// cell is read.
 //
 // Usage: node scripts/walk-assert.js --platform ios|android --dir <dir>
 //          [--web <dir>] [--themes default,carbon,material]
@@ -104,25 +101,18 @@ for (const theme of THEMES) {
     for (const cell of web.cells) {
       webCells[cell.component + '/' + cell.state] = cell;
     }
-    // The widest a cell body can be on this device: the grid's width minus
-    // the chrome the report itself carries. A wider measure means the
-    // component was capped by its host, not collapsed
-    if (report.gridWidth > 0) {
-      check(Number.isFinite(report.cellChrome), theme + ': report carries no cellChrome');
+    // The reference must have been walked at this platform's own grid
+    // width: a different room re-lays out responsive cells, so the
+    // comparison below would pair unlike boxes
+    if (web.gridWidth !== report.gridWidth) {
+      check(false, theme + ': web gridWidth ' + web.gridWidth + ' != native ' + report.gridWidth + ': not the same room');
+      continue;
     }
-    const room = report.gridWidth > 0 ? report.gridWidth - report.cellChrome : 0;
     for (const cell of report.cells) {
       const key = cell.component + '/' + cell.state;
       const other = webCells[key];
-      const bound = other === undefined || room === 0 ? (other ? other.width : 0) : Math.min(other.width, room);
-      // A cell the host shrank reflows: wrapping can only grow its height,
-      // never shrink it below the unconstrained web box
-      const capped = other !== undefined && bound < other.width;
-      const heightOk = other !== undefined && (capped
-        ? cell.height >= other.height - TOLERANCE
-        : Math.abs(cell.height - other.height) <= TOLERANCE);
-      const ok = other !== undefined && cell.width >= bound - WIDTH_TOLERANCE &&
-        cell.width <= bound + WIDTH_TOLERANCE && heightOk;
+      const ok = other !== undefined && Math.abs(cell.width - other.width) <= WIDTH_TOLERANCE &&
+        Math.abs(cell.height - other.height) <= TOLERANCE;
       check(ok, theme + ': ' + key + ' ' + cell.width + 'x' + cell.height + ' vs web ' + (other ? other.width + 'x' + other.height : 'missing'));
     }
   }
