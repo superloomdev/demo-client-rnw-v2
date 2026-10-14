@@ -83,32 +83,36 @@ jobs:
       # The iOS simulator's grid reports 370 and the Android emulator's 288;
       # the walker's scroll padding (16 a side) sits between the viewport
       # and the grid width the report names. walk-assert fails the run when
-      # the two grid widths differ, so a changed room cannot compare silently
+      # the two grid widths differ, so a changed room cannot compare silently.
+      # The reports move out of test-results at once: playwright empties its
+      # outputDir at the start of every run, so a report left there does not
+      # survive the next walk
       - name: Run the web walker at the iOS room
         working-directory: codebase-demo-client-rnw-v2
         env:
           WALK_VIEWPORT: '402'
         run: |
           npx playwright test e2e/walker.spec.js
-          mv test-results/walk test-results/walk-ios
+          mkdir -p walk-out
+          mv test-results/walk walk-out/ios
       - name: Run the web walker at the Android room
         working-directory: codebase-demo-client-rnw-v2
         env:
           WALK_VIEWPORT: '320'
         run: |
           npx playwright test e2e/walker.spec.js
-          mv test-results/walk test-results/walk-android
+          mv test-results/walk walk-out/android
       - name: Upload web reports (iOS room)
         uses: actions/upload-artifact@v7
         with:
           name: web-walk-ios
-          path: codebase-demo-client-rnw-v2/test-results/walk-ios/
+          path: codebase-demo-client-rnw-v2/walk-out/ios/
           retention-days: 14
       - name: Upload web reports (Android room)
         uses: actions/upload-artifact@v7
         with:
           name: web-walk-android
-          path: codebase-demo-client-rnw-v2/test-results/walk-android/
+          path: codebase-demo-client-rnw-v2/walk-out/android/
           retention-days: 14
 
   ios:
