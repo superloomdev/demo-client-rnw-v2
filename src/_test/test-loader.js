@@ -16,6 +16,7 @@ import { buildSystem, THEME_PLATFORM } from '../themes/build-system.js';
 import ShowcaseIndex from '../screens/showcase/ShowcaseIndex.js';
 import FamilyPage from '../screens/showcase/FamilyPage.js';
 import { getFamilies, getHref } from '../screens/showcase/catalog.js';
+import { CELL_CHROME } from '../screens/showcase/cell-chrome.js';
 import { buildReport } from '../screens/walk/report.js';
 import Walker from '../screens/walk/Walker.js';
 import Autopilot from '../screens/walk/Autopilot.js';
@@ -228,12 +229,18 @@ describe('showcase', function () {
       const body = renderer.root.findAll(function (node) {
         return typeof node.type === 'string' && node.props['data-testid'] === 'body-' + entry.name + '-' + entry.sample[0].label;
       })[0];
-      assert.deepEqual(body.props.style || null, entry.frame ? Object.assign(
-        {},
-        entry.frame.height !== undefined ? { height: entry.frame.height + 'px' } : null,
-        entry.frame.stage === true ? { transform: 'translateX(0px)' } : null,
-        { width: entry.frame.width + 'px' }
-      ) : null, entry.name);
+      // Every body caps at the room the grid reports (the 2000 layOutGrids
+      // names minus the cell chrome), so a child's percentage max-width has
+      // the same definite containing block on every platform
+      assert.deepEqual(body.props.style || null, Object.assign(
+        { maxWidth: 2000 - CELL_CHROME + 'px' },
+        entry.frame ? Object.assign(
+          {},
+          entry.frame.height !== undefined ? { height: entry.frame.height + 'px' } : null,
+          entry.frame.stage === true ? { transform: 'translateX(0px)' } : null,
+          { width: entry.frame.width + 'px' }
+        ) : null
+      ), entry.name);
       await act(async function () {
         renderer.unmount();
       });
