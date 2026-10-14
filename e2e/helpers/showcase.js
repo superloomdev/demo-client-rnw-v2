@@ -112,7 +112,10 @@ export async function getA11yTrees (page) {
           parts.push('text=' + JSON.stringify(text.replace(/\s/g, '')));
         }
         lines.push('  '.repeat(depth) + parts.join(' '));
-        if (node.tagName.toLowerCase() === 'svg') {
+        // An svg or an img-role node is one accessible node; its children
+        // are drawing (ARIA marks an img's descendants presentational), and
+        // a theme may draw the same picture with a different construction
+        if (node.tagName.toLowerCase() === 'svg' || node.getAttribute('role') === 'img') {
           return;
         }
         for (const child of node.children) {

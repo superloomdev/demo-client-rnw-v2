@@ -17,4 +17,5 @@ function element (tag) {
 export const Svg = element('svg');
 export const G = element('g');
 export const Path = element('path');
+export const Circle = element('circle');
 export default Svg;

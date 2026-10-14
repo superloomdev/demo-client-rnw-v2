@@ -338,7 +338,9 @@ describe('walker', function () {
 
   test('a mounted walker walks again, under the new theme, when a warm deep link changes it', async function () {
     const expected = Lib.Components.catalog.reduce(function (sum, entry) {
-      return sum + entry.sample.length;
+      return sum + entry.sample.filter(function (state) {
+        return state.cell !== false;
+      }).length;
     }, 0);
     const App = function (props) {
       const { ThemeProvider } = Lib.ThemeContext;
@@ -379,7 +381,9 @@ describe('autopilot', function () {
       return Lib.Components.catalog.filter(function (entry) {
         return family === null || entry.family === family;
       }).reduce(function (sum, entry) {
-        return sum + entry.sample.length;
+        return sum + entry.sample.filter(function (state) {
+          return state.cell !== false;
+        }).length;
       }, 0);
     };
 
@@ -632,7 +636,9 @@ describe('walker report', function () {
     });
     assert.deepEqual(Object.keys(report).sort(), ['brand', 'cellChrome', 'cells', 'components', 'errors', 'expectedCells', 'family', 'fonts', 'gridWidth', 'platform', 'schema', 'scheme', 'theme', 'tokens']);
     assert.equal(report.expectedCells, Lib.Components.catalog.reduce(function (sum, entry) {
-      return sum + entry.sample.length;
+      return sum + entry.sample.filter(function (state) {
+        return state.cell !== false;
+      }).length;
     }, 0));
     assert.equal(report.tokens['color.interactive'], Lib.Themes.brands.acme.tokens['color.interactive']);
     const sans = report.fonts.find(function (font) {

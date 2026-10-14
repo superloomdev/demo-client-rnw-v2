@@ -10,7 +10,9 @@ import { PROFILES, catalog, openPage } from './helpers/showcase.js';
 
 const WALK_OUT = join(process.cwd(), 'test-results', 'walk');
 const EXPECTED_CELLS = catalog.reduce(function (sum, entry) {
-  return sum + entry.sample.length;
+  return sum + entry.sample.filter(function (state) {
+    return state.cell !== false;
+  }).length;
 }, 0);
 
 

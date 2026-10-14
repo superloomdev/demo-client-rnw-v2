@@ -58,8 +58,13 @@ function WalkerRun (props) {
   const entries = Lib.Components.catalog.filter(function (entry) {
     return !props.family || entry.family === props.family;
   });
+  // A state the sample marks `cell: false` mounts in the unit gates but
+  // not the grids (its drawing escapes a cell by design) - the walker
+  // measures the grids
   const expected = entries.reduce(function (sum, entry) {
-    return sum + entry.sample.length;
+    return sum + entry.sample.filter(function (state) {
+      return state.cell !== false;
+    }).length;
   }, 0);
 
   // Init the measurements, the errors, the grid room and the send status.
@@ -127,7 +132,9 @@ function WalkerRun (props) {
     React.createElement(Text, { testID: 'walk-status' }, 'walk: ' + status + ' (' + measured + '/' + expected + ')'),
     React.createElement(View, { testID: 'walk-grid', onLayout: onGridLayout, style: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 } },
       gridWidth > 0 ? entries.flatMap(function (entry) {
-        return entry.sample.map(function (state) {
+        return entry.sample.filter(function (state) {
+          return state.cell !== false;
+        }).map(function (state) {
           const key = entry.name + '/' + state.label;
           return React.createElement(SafeCell, {
             key: key,

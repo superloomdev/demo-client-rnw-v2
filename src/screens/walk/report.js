@@ -53,7 +53,10 @@ export function buildReport (input) {
       return entry.name;
     }),
     expectedCells: input.catalog.reduce(function (sum, entry) {
-      return sum + entry.sample.length;
+      // The grids skip `cell: false` states, so the walk does too
+      return sum + entry.sample.filter(function (state) {
+        return state.cell !== false;
+      }).length;
     }, 0),
     cells: input.cells,
     errors: input.errors,
