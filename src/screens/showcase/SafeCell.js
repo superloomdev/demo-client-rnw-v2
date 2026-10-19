@@ -51,12 +51,43 @@ export default function createSafeCell (Lib) {
 
 
   /********************************************************************
+  The mounted sample: the component from `state.props` plus the state's
+  `wrappers` composition applied around it through the registry, first
+  entry outermost. Rendered as the Boundary's child so a bad wrapper is
+  a recorded cell error, not a crashed page.
+
+  @param {Object} props - { Component, entry, state, Registry }
+
+  @return {Object} - React element
+  *********************************************************************/
+  function SampleBody (props) {
+
+    let element = React.createElement(props.Component, props.state.props);
+    const wrappers = Lib.Utils.isArray(props.state.wrappers) ? props.state.wrappers : [];
+    for (let i = wrappers.length - 1; i >= 0; i = i - 1) {
+      const descriptor = wrappers[i];
+      const factory = descriptor && Lib.Utils.isString(descriptor.component)
+        ? props.Registry[descriptor.component]
+        : undefined;
+      if (factory === undefined) {
+        throw new TypeError('sample wrapper "' + (descriptor && descriptor.component) + '" of ' + props.entry.name + ' / ' + props.state.label + ' is not in the registry');
+      }
+      element = React.createElement(factory, descriptor.props || {}, element);
+    }
+
+    return element;
+
+  }
+
+
+  /********************************************************************
   One cell.
 
   @param {Object}   props           - React props
   @param {Object}   props.Component - The registry component
   @param {Object}   props.entry     - Catalog entry
   @param {Object}   props.state     - One sample state { label, props }
+  @param {Object}   props.Registry  - The current theme's registry (the wrappers' factories)
   @param {Function} [props.Host]    - The registry's OverlayHost
   @param {Number}   [props.room]    - The width a cell body may take
   @param {Function} [props.onLayout] - Layout callback for the body
@@ -73,7 +104,12 @@ export default function createSafeCell (Lib) {
     // an overlay (Menu, Modal) keeps its layer inside its own cell on every
     // platform, the way the web stage transform already does
     const guarded = React.createElement(Boundary, { onError: props.onError },
-      React.createElement(props.Component, props.state.props));
+      React.createElement(SampleBody, {
+        Component: props.Component,
+        entry: props.entry,
+        state: props.state,
+        Registry: props.Registry
+      }));
     const staged = props.entry.frame && props.entry.frame.stage === true && props.Host;
     const content = staged
       ? React.createElement(props.Host, null, guarded)

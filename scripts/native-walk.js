@@ -1,5 +1,5 @@
 // Info: Drives the walker on a booted simulator or emulator for the native
-// gate. For each template it starts a walk, waits for the report file, then
+// gate. For each template and light/dark scheme it starts a walk, waits for the report file, then
 // walks once per family and takes a screenshot. The walk server must already
 // be running and writing to `--out`. Two ways to steer the app:
 //
@@ -15,14 +15,16 @@
 // Usage: node scripts/native-walk.js --platform ios|android --out <dir>
 //          [--mode link|command] [--report-host localhost|10.0.2.2]
 //          [--port 8787] [--themes default,carbon,material] [--timeout 180]
+//          [--schemes light,dark]
 //          [--app-id com.anonymous.nimbusrnwdemo]
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, writeFileSync } from 'node:fs';
+import { existsSync, statSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 import { catalog } from '../hosts/expo/node_modules/@superloomdev/rnw-components/catalog.js';
 import { isAppFocused } from './device-focus.js';
+import { reportName, walkCases } from './walk-matrix.js';
 
 const arg = function (flag, fallback) {
   const index = process.argv.indexOf(flag);
@@ -33,6 +35,7 @@ const OUT = resolve(arg('--out', 'walk-out'));
 const PORT = arg('--port', '8787');
 const HOST = arg('--report-host', PLATFORM === 'android' ? '10.0.2.2' : 'localhost');
 const THEMES = arg('--themes', 'default,carbon,material').split(',');
+const CASES = walkCases(THEMES, arg('--schemes', 'light,dark').split(','));
 const TIMEOUT_S = Number(arg('--timeout', '180'));
 const APP_ID = arg('--app-id', 'com.anonymous.nimbusrnwdemo');
 const MODE = arg('--mode', 'link');
@@ -115,15 +118,16 @@ Post a walk command to the server (command mode).
 
 @param {String}      theme  - Template name
 @param {String|null} family - One family, or null for all
+@param {String}      scheme - Actual profile scheme ID
 
 @return {Promise<undefined>}
 *********************************************************************/
-async function postCommand (theme, family) {
+async function postCommand (theme, family, scheme) {
 
   const response = await fetch('http://localhost:' + PORT + '/command', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ theme: theme, family: family })
+    body: JSON.stringify({ theme: theme, family: family, scheme: scheme })
   });
   if (!response.ok) {
     throw new Error('native-walk: POST /command answered ' + response.status);
@@ -138,19 +142,21 @@ Start a walk: a deep link in link mode, a server command in command mode.
 
 @param {String}      theme  - Template name
 @param {String|null} family - One family, or null for all
+@param {String}      scheme - Actual profile scheme ID
 
 @return {Promise<undefined>}
 *********************************************************************/
-async function startWalk (theme, family) {
+async function startWalk (theme, family, scheme) {
 
   if (MODE === 'command') {
-    await postCommand(theme, family);
+    await postCommand(theme, family, scheme);
     return;
   }
   const reportUrl = 'http://' + HOST + ':' + PORT + '/report';
+  const query = '?theme=' + encodeURIComponent(theme) + '&scheme=' + encodeURIComponent(scheme);
   openLink(family
-    ? 'nimbus://walk/' + family + '?theme=' + theme
-    : 'nimbus://walk?theme=' + theme + '&report=' + encodeURIComponent(reportUrl));
+    ? 'nimbus://walk/' + family + query
+    : 'nimbus://walk' + query + '&report=' + encodeURIComponent(reportUrl));
 
 }
 
@@ -215,14 +221,15 @@ Wait for a file to appear.
 
 @param {String} file    - Path
 @param {Number} seconds - Timeout
+@param {Number} started - Current walk's start time, rejecting an old run's file
 
 @return {Promise<Boolean>} - True when it appeared in time
 *********************************************************************/
-async function waitForFile (file, seconds) {
+async function waitForFile (file, seconds, started) {
 
   const deadline = Date.now() + seconds * 1000;
   while (Date.now() < deadline) {
-    if (existsSync(file)) {
+    if (existsSync(file) && statSync(file).mtimeMs >= started) {
       return true;
     }
     await new Promise(function (done) {
@@ -283,29 +290,33 @@ if (MODE === 'command') {
   launchApp();
 }
 
-for (const theme of THEMES) {
+for (const entry of CASES) {
+  const theme = entry.theme;
+  const scheme = entry.scheme;
+  const caseId = theme + '-' + scheme;
 
   // Walk every family and wait for the report
-  const report = join(OUT, PLATFORM + '-' + theme + '.json');
-  process.stdout.write('native-walk: ' + PLATFORM + ' ' + theme + ' (' + MODE + ') -> ' + report + '\n');
+  const report = join(OUT, reportName({ platform: PLATFORM, theme: theme, scheme: scheme }));
+  process.stdout.write('native-walk: ' + PLATFORM + ' ' + caseId + ' (' + MODE + ') -> ' + report + '\n');
   if (MODE === 'link') {
     stopApp();
   }
-  await startWalk(theme, null);
-  if (!await waitForFile(report, TIMEOUT_S)) {
+  const started = Date.now();
+  await startWalk(theme, null, scheme);
+  if (!await waitForFile(report, TIMEOUT_S, started)) {
     missing.push(report);
-    screenshot(join(OUT, PLATFORM + '-' + theme + '-TIMEOUT.png'));
-    captureAndroidEvidence(theme);
+    screenshot(join(OUT, PLATFORM + '-' + caseId + '-TIMEOUT.png'));
+    captureAndroidEvidence(caseId);
     continue;
   }
 
   // One screenshot per family
   for (const family of FAMILIES) {
-    await startWalk(theme, family);
+    await startWalk(theme, family, scheme);
     await new Promise(function (done) {
       setTimeout(done, 5000);
     });
-    screenshot(join(OUT, PLATFORM + '-' + theme + '-' + family + '.png'));
+    screenshot(join(OUT, PLATFORM + '-' + caseId + '-' + family + '.png'));
   }
 
 }
@@ -318,4 +329,4 @@ if (obscured.length > 0) {
   process.stderr.write('native-walk: another window had focus for: ' + obscured.join(', ') + '\n');
   process.exit(1);
 }
-process.stdout.write('native-walk: ' + THEMES.length + ' reports, ' + (THEMES.length * FAMILIES.length) + ' family screenshots\n');
+process.stdout.write('native-walk: ' + CASES.length + ' reports, ' + (CASES.length * FAMILIES.length) + ' family screenshots\n');

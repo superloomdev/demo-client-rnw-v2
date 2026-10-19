@@ -141,6 +141,7 @@ function WalkerRun (props) {
             Component: ctx.Registry[entry.name],
             entry: entry,
             state: state,
+            Registry: ctx.Registry,
             Host: ctx.Registry.OverlayHost,
             room: gridWidth - CELL_CHROME,
             onLayout: function (event) {

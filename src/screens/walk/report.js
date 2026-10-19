@@ -7,7 +7,7 @@ import { CELL_CHROME } from '../showcase/cell-chrome.js';
 
 // A small token sample the report carries so a brand layer's reach is
 // visible in the artifact without shipping the whole theme
-const TOKEN_SAMPLE = ['color.interactive', 'color.focus', 'shape.radius_04', 'shape.radius_08', 'font.family.sans'];
+const TOKEN_SAMPLE = ['color.interactive', 'color.focus', 'color.focus_inverse', 'color.background_inverse', 'shape.radius_04', 'shape.radius_08', 'font.family.sans'];
 
 
 /********************************************************************

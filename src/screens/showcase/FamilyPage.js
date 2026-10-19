@@ -90,6 +90,7 @@ function EntryGrid (props) {
       Component: props.ctx.Registry[props.entry.name],
       entry: props.entry,
       state: state,
+      Registry: props.ctx.Registry,
       Host: props.ctx.Registry.OverlayHost,
       room: gridWidth - CELL_CHROME
     });
