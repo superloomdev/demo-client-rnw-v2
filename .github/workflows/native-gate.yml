@@ -150,6 +150,9 @@ jobs:
         with:
           name: web-walk-ios
           path: web-walk-ios
+      - name: Install native assertion tools
+        working-directory: codebase-demo-client-rnw-v2
+        run: npm ci
       - name: Cache Pods
         uses: actions/cache@v6
         with:
@@ -230,6 +233,9 @@ jobs:
         with:
           name: web-walk-android
           path: web-walk-android
+      - name: Install native assertion tools
+        working-directory: codebase-demo-client-rnw-v2
+        run: npm ci
       - name: Install, prebuild and assemble Release
         working-directory: codebase-demo-client-rnw-v2/hosts/expo
         run: |

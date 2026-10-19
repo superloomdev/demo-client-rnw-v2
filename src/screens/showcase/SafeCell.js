@@ -89,6 +89,8 @@ export default function createSafeCell (Lib) {
   @param {Object}   props.state     - One sample state { label, props }
   @param {Object}   props.Registry  - The current theme's registry (the wrappers' factories)
   @param {Function} [props.Host]    - The registry's OverlayHost
+  @param {String}   [props.captionColor] - The caption's color (the theme's secondary text)
+  @param {String}   [props.borderColor]  - The frame's border color (the theme's subtle border)
   @param {Number}   [props.room]    - The width a cell body may take
   @param {Function} [props.onLayout] - Layout callback for the body
   @param {Function} [props.onError]  - Error callback
@@ -119,9 +121,9 @@ export default function createSafeCell (Lib) {
     return React.createElement(View, {
       testID: 'cell-' + id,
       dataSet: { cell: 'true', component: props.entry.name, state: props.state.label, family: props.entry.family },
-      style: { padding: CELL_PADDING, borderWidth: CELL_BORDER, borderStyle: 'dashed', borderColor: '#c6c6c6', alignItems: 'flex-start', gap: 8 }
+      style: { padding: CELL_PADDING, borderWidth: CELL_BORDER, borderStyle: 'dashed', borderColor: props.borderColor === undefined ? '#c6c6c6' : props.borderColor, alignItems: 'flex-start', gap: 8 }
     },
-    React.createElement(Text, { style: { fontSize: 11, color: '#6f6f6f' } }, props.entry.name + ' / ' + props.state.label),
+    React.createElement(Text, { style: { fontSize: 11, color: props.captionColor === undefined ? '#6f6f6f' : props.captionColor } }, props.entry.name + ' / ' + props.state.label),
     // A component that fills its container is laid out in the frame its catalog entry names,
     // capped at the room the grid reports: a stage wider than the body would run off-screen.
     // A `stage` frame makes the body the containing block of a fixed layer, so an overlay

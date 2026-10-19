@@ -19,12 +19,14 @@
 //          [--app-id com.anonymous.nimbusrnwdemo]
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { PNG } from 'pngjs';
 
 import { catalog } from '../hosts/expo/node_modules/@superloomdev/rnw-components/catalog.js';
 import { isAppFocused } from './device-focus.js';
 import { reportName, walkCases } from './walk-matrix.js';
+import { assertNativeScenePaint, NATIVE_SCENE_FAMILIES } from './native-scene-paint.js';
 
 const arg = function (flag, fallback) {
   const index = process.argv.indexOf(flag);
@@ -56,6 +58,11 @@ const FAMILIES = catalog.reduce(function (out, entry) {
   }
   return out;
 }, []);
+for (const family of NATIVE_SCENE_FAMILIES) {
+  if (!FAMILIES.includes(family)) {
+    throw new Error('native-walk: no catalog coverage for required scene-paint family ' + family);
+  }
+}
 
 
 /********************************************************************
@@ -310,13 +317,19 @@ for (const entry of CASES) {
     continue;
   }
 
+  const background = JSON.parse(readFileSync(report, 'utf8')).tokens['color.background'];
   // One screenshot per family
   for (const family of FAMILIES) {
     await startWalk(theme, family, scheme);
     await new Promise(function (done) {
       setTimeout(done, 5000);
     });
-    screenshot(join(OUT, PLATFORM + '-' + caseId + '-' + family + '.png'));
+    const file = join(OUT, PLATFORM + '-' + caseId + '-' + family + '.png');
+    screenshot(file);
+    if (NATIVE_SCENE_FAMILIES.includes(family)) {
+      assertNativeScenePaint(PNG.sync.read(readFileSync(file)), background);
+      process.stdout.write('native-walk: scene paint ' + PLATFORM + ' / ' + caseId + ' / ' + family + ' PASS\n');
+    }
   }
 
 }

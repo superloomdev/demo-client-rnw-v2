@@ -6,6 +6,7 @@
 // family (nimbus://walk/<Family>?theme=<t>). On web the report is also left
 // on `globalThis.__walk` for the e2e tests.
 import { useLib } from '../../app-core/contexts/lib-context.js';
+import Scene from '../Scene.js';
 import createSafeCell from '../showcase/SafeCell.js';
 import { CELL_CHROME } from '../showcase/cell-chrome.js';
 import { buildReport } from './report.js';
@@ -30,8 +31,9 @@ export default function Walker (props) {
   const ctx = Lib.ThemeContext.useThemeController();
   const key = [ctx.profileName, ctx.schemeName, ctx.brandName || '', props.family || '', props.report || ''].join('|');
 
-  // Render one run per selection and request
-  return React.createElement(WalkerRun, { key: key, family: props.family, report: props.report });
+  // Render one run per selection and request, inside the route's own scene
+  return React.createElement(Scene, { key: key },
+    React.createElement(WalkerRun, { family: props.family, report: props.report }));
 
 }
 
@@ -129,7 +131,7 @@ function WalkerRun (props) {
 
   // Render every cell once the room is known, recording its layout and any error
   return React.createElement(ScrollView, { testID: 'walker', contentContainerStyle: { padding: 16, gap: 12 } },
-    React.createElement(Text, { testID: 'walk-status' }, 'walk: ' + status + ' (' + measured + '/' + expected + ')'),
+    React.createElement(Text, { testID: 'walk-status', style: { color: ctx.theme['color.text_primary'] } }, 'walk: ' + status + ' (' + measured + '/' + expected + ')'),
     React.createElement(View, { testID: 'walk-grid', onLayout: onGridLayout, style: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 } },
       gridWidth > 0 ? entries.flatMap(function (entry) {
         return entry.sample.filter(function (state) {
@@ -143,6 +145,8 @@ function WalkerRun (props) {
             state: state,
             Registry: ctx.Registry,
             Host: ctx.Registry.OverlayHost,
+            captionColor: ctx.theme['color.text_secondary'],
+            borderColor: ctx.theme['color.border_subtle_01'],
             room: gridWidth - CELL_CHROME,
             onLayout: function (event) {
               const first = cells.current[key] === undefined;
