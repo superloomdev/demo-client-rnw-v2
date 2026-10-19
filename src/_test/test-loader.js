@@ -481,7 +481,7 @@ describe('autopilot', function () {
 
 describe('walk-server', function () {
 
-  test('holds the command and writes each report under platform-theme[-family].json', async function () {
+  test('holds the command and writes distinct scheme-qualified reports', async function () {
     const out = mkdtempSync(join(tmpdir(), 'walk-'));
     const script = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'scripts', 'walk-server.js');
     const server = spawn('node', [script, '--port', '8797', '--out', out], { stdio: 'ignore' });
@@ -505,11 +505,19 @@ describe('walk-server', function () {
       await fetch('http://localhost:8797/command', { method: 'POST', body: JSON.stringify({ theme: 'carbon', family: 'Icon' }) });
       assert.deepEqual(await (await fetch('http://localhost:8797/command')).json(), { theme: 'carbon', family: 'Icon' });
 
-      const posted = await fetch('http://localhost:8797/report', { method: 'POST', headers: { 'content-type': 'text/plain' }, body: JSON.stringify({ platform: 'ios', theme: 'carbon', family: 'Icon', cells: [] }) });
+      const posted = await fetch('http://localhost:8797/report', { method: 'POST', headers: { 'content-type': 'text/plain' }, body: JSON.stringify({ platform: 'ios', theme: 'carbon', scheme: 'white', family: 'Icon', cells: [] }) });
       assert.equal(posted.status, 200);
-      assert.deepEqual(await posted.json(), { received: 'ios-carbon-Icon.json' });
-      assert.ok(existsSync(join(out, 'ios-carbon-Icon.json')));
-      assert.equal(JSON.parse(readFileSync(join(out, 'ios-carbon-Icon.json'), 'utf8')).theme, 'carbon');
+      assert.deepEqual(await posted.json(), { received: 'ios-carbon-white-Icon.json' });
+      assert.ok(existsSync(join(out, 'ios-carbon-white-Icon.json')));
+      const dark = await fetch('http://localhost:8797/report', {
+        method: 'POST', body: JSON.stringify({ platform: 'ios', theme: 'carbon', scheme: 'g100', family: 'Icon', cells: [] })
+      });
+      assert.equal(dark.status, 200);
+      assert.ok(existsSync(join(out, 'ios-carbon-g100-Icon.json')));
+      assert.equal(JSON.parse(readFileSync(join(out, 'ios-carbon-white-Icon.json'), 'utf8')).scheme, 'white');
+      assert.equal((await fetch('http://localhost:8797/report', {
+        method: 'POST', body: JSON.stringify({ platform: 'ios', theme: 'carbon' })
+      })).status, 400, 'a scheme-less report must not overwrite evidence');
       assert.equal((await fetch('http://localhost:8797/report', { method: 'POST', body: 'not json' })).status, 400);
     } finally {
       server.kill();
@@ -541,6 +549,7 @@ describe('walk-assert', function () {
     return {
       platform: platform,
       theme: 'default',
+      scheme: 'light',
       errors: [],
       expectedCells: 1,
       gridWidth: 370,
@@ -563,13 +572,13 @@ describe('walk-assert', function () {
 
   @return {Object} - { status, out }
   *********************************************************************/
-  function run (native, web) {
+  function run (native, web, schemes = 'light') {
 
     const dir = mkdtempSync(join(tmpdir(), 'walk-assert-'));
     try {
-      writeFileSync(join(dir, 'ios-default.json'), JSON.stringify(native));
-      writeFileSync(join(dir, 'web-default.json'), JSON.stringify(web));
-      const result = spawnSync('node', [SCRIPT, '--platform', 'ios', '--dir', dir, '--web', dir, '--themes', 'default'], { stdio: 'pipe' });
+      writeFileSync(join(dir, 'ios-default-light.json'), JSON.stringify(native));
+      writeFileSync(join(dir, 'web-default-light.json'), JSON.stringify(web));
+      const result = spawnSync('node', [SCRIPT, '--platform', 'ios', '--dir', dir, '--web', dir, '--themes', 'default', '--schemes', schemes], { stdio: 'pipe' });
       return { status: result.status, out: String(result.stdout) };
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -579,6 +588,14 @@ describe('walk-assert', function () {
 
   const WEB = fixture('web', { width: 100, height: 20 });
 
+  test('missing dark reports and wrong-scheme identities fail instead of reusing light evidence', function () {
+    const native = fixture('ios', { width: 100, height: 20 });
+    const missingDark = run(native, WEB, 'light,dark');
+    assert.equal(missingDark.status, 1);
+    assert.match(missingDark.out, /ios-default-dark\.json/);
+    assert.equal(run(Object.assign({}, native, { scheme: 'dark' }), WEB).status, 1);
+    assert.equal(run(native, Object.assign({}, WEB, { scheme: 'dark' })).status, 1);
+  });
   test('widths agree within two points (one pixel rounding per platform), heights within one', function () {
     assert.equal(run(fixture('ios', { width: 101.67, height: 20.8 }), WEB).status, 0);
     assert.equal(run(fixture('ios', { width: 98, height: 20 }), WEB).status, 0);

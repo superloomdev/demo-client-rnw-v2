@@ -2,6 +2,7 @@
 // family, rendered from the library's catalog under the current theme, one
 // guarded cell per state. The web e2e gates and screenshots read this page.
 import { useLib } from '../../app-core/contexts/lib-context.js';
+import Scene from '../Scene.js';
 import createSafeCell from './SafeCell.js';
 import { CELL_CHROME } from './cell-chrome.js';
 
@@ -32,21 +33,25 @@ export default function FamilyPage (props) {
 
   // An unknown family renders a plain message, not an empty page
   if (Lib.Utils.isEmptyArray(entries)) {
-    return React.createElement(Text, { testID: 'family-missing' }, 'No family "' + props.family + '" in the catalog');
+    return React.createElement(Scene, null,
+      React.createElement(Text, { testID: 'family-missing', style: { color: ctx.theme['color.text_primary'] } },
+        'No family "' + props.family + '" in the catalog'));
   }
 
-  // Render one section per component, one cell per sample state
-  return React.createElement(ScrollView, {
-    testID: 'family-' + props.family,
-    dataSet: { family: props.family, profile: ctx.profileName, scheme: ctx.schemeName, brand: ctx.brandName || '' },
-    contentContainerStyle: { padding: 24, gap: 16 }
-  },
-  React.createElement(Text, { style: { fontSize: 20, fontWeight: '600' } }, props.family),
-  entries.map(function (entry) {
-    return React.createElement(View, { key: entry.name, style: { gap: 8 } },
-      React.createElement(Text, { style: { fontSize: 16 } }, entry.name + ' - ' + entry.tier + ', ' + entry.platform),
-      React.createElement(EntryGrid, { Lib: Lib, ctx: ctx, entry: entry, SafeCell: SafeCell }));
-  }));
+  // Render one section per component, one cell per sample state, inside
+  // the route's own scene
+  return React.createElement(Scene, null,
+    React.createElement(ScrollView, {
+      testID: 'family-' + props.family,
+      dataSet: { family: props.family, profile: ctx.profileName, scheme: ctx.schemeName, brand: ctx.brandName || '' },
+      contentContainerStyle: { padding: 24, gap: 16 }
+    },
+    React.createElement(Text, { testID: 'family-title', style: { fontSize: 20, fontWeight: '600', color: ctx.theme['color.text_primary'] } }, props.family),
+    entries.map(function (entry) {
+      return React.createElement(View, { key: entry.name, style: { gap: 8 } },
+        React.createElement(Text, { testID: 'component-title-' + entry.name, style: { fontSize: 16, color: ctx.theme['color.text_primary'] } }, entry.name + ' - ' + entry.tier + ', ' + entry.platform),
+        React.createElement(EntryGrid, { Lib: Lib, ctx: ctx, entry: entry, SafeCell: SafeCell }));
+    })));
 
 }
 
@@ -90,7 +95,10 @@ function EntryGrid (props) {
       Component: props.ctx.Registry[props.entry.name],
       entry: props.entry,
       state: state,
+      Registry: props.ctx.Registry,
       Host: props.ctx.Registry.OverlayHost,
+      captionColor: props.ctx.theme['color.text_secondary'],
+      borderColor: props.ctx.theme['color.border_subtle_01'],
       room: gridWidth - CELL_CHROME
     });
   }) : null);

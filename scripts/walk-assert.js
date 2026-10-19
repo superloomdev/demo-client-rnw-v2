@@ -17,10 +17,13 @@
 //
 // Usage: node scripts/walk-assert.js --platform ios|android --dir <dir>
 //          [--web <dir>] [--themes default,carbon,material]
+//          [--schemes light,dark]
 // Exit 1 on any failure; prints one PASS/FAIL line per check.
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+
+import { reportName, walkCases } from './walk-matrix.js';
 
 const arg = function (flag, fallback) {
   const index = process.argv.indexOf(flag);
@@ -30,6 +33,7 @@ const PLATFORM = arg('--platform', '');
 const DIR = resolve(arg('--dir', 'walk-out'));
 const WEB = arg('--web', null);
 const THEMES = arg('--themes', 'default,carbon,material').split(',');
+const CASES = walkCases(THEMES, arg('--schemes', 'light,dark').split(','));
 const TOLERANCE = 1;
 const WIDTH_TOLERANCE = 2;
 // Font roles whose family must be drawn as named; the others are reported
@@ -55,10 +59,12 @@ function check (ok, message) {
 }
 
 
-for (const theme of THEMES) {
+for (const entry of CASES) {
+  const theme = entry.theme;
+  const scheme = entry.scheme;
 
   // The report must exist and parse
-  const file = join(DIR, PLATFORM + '-' + theme + '.json');
+  const file = join(DIR, reportName({ platform: PLATFORM, theme: theme, scheme: scheme }));
   if (!existsSync(file)) {
     check(false, theme + ': report ' + file + ' exists');
     continue;
@@ -66,7 +72,8 @@ for (const theme of THEMES) {
   const report = JSON.parse(readFileSync(file, 'utf8'));
 
   // Identity, errors, coverage and sizes
-  check(report.platform === PLATFORM && report.theme === theme, theme + ': report is for ' + PLATFORM + ' / ' + theme);
+  check(report.platform === PLATFORM && report.theme === theme && report.scheme === scheme,
+    theme + ': report is for ' + PLATFORM + ' / ' + theme + ' / ' + scheme);
   check(Array.isArray(report.errors) && report.errors.length === 0, theme + ': zero render errors ' + JSON.stringify(report.errors));
   check(report.cells.length === report.expectedCells, theme + ': ' + report.cells.length + ' of ' + report.expectedCells + ' cells measured');
   const empty = report.cells.filter(function (cell) {
@@ -86,12 +93,14 @@ for (const theme of THEMES) {
 
   // Geometry against the web walker
   if (WEB) {
-    const webFile = join(resolve(WEB), 'web-' + theme + '.json');
+    const webFile = join(resolve(WEB), reportName({ platform: 'web', theme: theme, scheme: scheme }));
     if (!existsSync(webFile)) {
       check(false, theme + ': web report ' + webFile + ' exists');
       continue;
     }
     const web = JSON.parse(readFileSync(webFile, 'utf8'));
+    check(web.platform === 'web' && web.theme === theme && web.scheme === scheme,
+      theme + ': web baseline is the same theme and scheme ' + scheme);
     for (const font of web.fonts.filter(function (entry) {
       return REQUIRED_FONTS.includes(entry.role);
     })) {

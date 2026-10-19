@@ -5,7 +5,7 @@
 #    sets: a cell capped by its host re-lays out with the room, so the
 #    reference must have seen the same room to compare like with like.
 # 2. ios and android build the Expo app in Release, start the walk server and
-#    walk every template (scripts/native-walk.js): Android by deep link,
+#    walk every template in light and dark (scripts/native-walk.js): Android by deep link,
 #    nimbus://walk?theme=<t>&report=<url> from a stopped app (cold) and
 #    nimbus://walk/<Family>?theme=<t> into the running app (warm); iOS by
 #    server command (autopilot build, see the ios job), because iOS confirms
@@ -150,6 +150,9 @@ jobs:
         with:
           name: web-walk-ios
           path: web-walk-ios
+      - name: Install native assertion tools
+        working-directory: codebase-demo-client-rnw-v2
+        run: npm ci
       - name: Cache Pods
         uses: actions/cache@v6
         with:
@@ -230,6 +233,9 @@ jobs:
         with:
           name: web-walk-android
           path: web-walk-android
+      - name: Install native assertion tools
+        working-directory: codebase-demo-client-rnw-v2
+        run: npm ci
       - name: Install, prebuild and assemble Release
         working-directory: codebase-demo-client-rnw-v2/hosts/expo
         run: |

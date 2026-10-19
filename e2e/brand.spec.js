@@ -8,6 +8,7 @@
 import { expect, test } from '@playwright/test';
 
 import { BRAND_LAYERS } from '../src/themes/brand-layers.js';
+import { focusBrandIssues } from './helpers/focus-brand.js';
 import { FAMILIES, PROFILES, catalog, openPage, waitForFamily } from './helpers/showcase.js';
 
 const ACME = BRAND_LAYERS.acme.tokens;
@@ -32,7 +33,7 @@ function toRgb (hex) {
 
 // The enabled focusable parts of a showcase page, excluding parts a
 // template mounts but does not draw (a close seat a template hides)
-const FOCUSABLE = '[data-cell="true"] :is([role="button"], [role="checkbox"], [role="combobox"], input):not([aria-disabled="true"]):not([disabled]):visible';
+const FOCUSABLE = '[data-cell="true"] :is([role="button"], [role="checkbox"], [role="combobox"], input):not([aria-disabled="true"]):not([disabled]):not([aria-hidden="true"]):not([aria-hidden="true"] *):visible';
 // A computed color with zero alpha
 const TRANSPARENT = /^rgba\(.*, 0\)$/;
 
@@ -46,16 +47,20 @@ walker reports its built theme.
 
 @return {Promise<Array>} - [focus, interactive] as `rgb()` strings
 *********************************************************************/
-async function getOwnFocusColors (page, profile) {
+async function getOwnFocusColors (page, profile, brand) {
 
-  const errors = await openPage(page, '/walk/Icon?profile=' + profile);
+  const errors = await openPage(page, '/walk/Icon?profile=' + profile + (brand ? '&brand=' + brand : ''));
   await expect(page.getByTestId('walk-status')).toContainText('walk: done');
   const tokens = await page.evaluate(function () {
     return globalThis.__walk.tokens;
   });
   expect(errors).toEqual([]);
 
-  return [toRgb(tokens['color.focus']), toRgb(tokens['color.interactive'])];
+  return {
+    normal: [toRgb(tokens['color.focus']), toRgb(tokens['color.interactive'])],
+    inverseFocus: toRgb(tokens['color.focus_inverse']),
+    inverseSurface: toRgb(tokens['color.background_inverse'])
+  };
 
 }
 
@@ -96,9 +101,18 @@ The paint of every element in a focusable part's cell, read in the page.
 function getPaint (node) {
 
   const cell = node.closest('[data-cell="true"]');
+  const surfaces = [];
+  for (let ancestor = node; ancestor; ancestor = ancestor.parentElement) {
+    const color = window.getComputedStyle(ancestor).backgroundColor;
+    if (color !== 'rgba(0, 0, 0, 0)') {
+      surfaces.push(color);
+    }
+  }
 
   return {
     state: cell.getAttribute('data-state'),
+    component: cell.getAttribute('data-component'),
+    surfaces: surfaces,
     parts: Array.from(cell.querySelectorAll('*')).map(function (candidate) {
       const style = window.getComputedStyle(candidate);
       return {
@@ -171,7 +185,7 @@ async function getFocusDrawn (page, path, family) {
         }
       }
     });
-    out.push({ state: before.state, colors: Array.from(new Set(colors)), changed: changed, browserRing: browserRing });
+    out.push({ state: before.state, component: before.component, surfaces: after.surfaces, colors: Array.from(new Set(colors)), changed: changed, browserRing: browserRing });
   }
   expect(errors).toEqual([]);
 
@@ -226,8 +240,9 @@ for (const profile of PROFILES) {
     const reached = { texts: 0, focusables: 0, corners: 0 };
     const wrong = [];
     const own = await getOwnFocusColors(page, profile);
+    const brandedPalette = await getOwnFocusColors(page, profile, 'acme');
     const brand = [toRgb(ACME['color.focus']), toRgb(ACME['color.interactive'])];
-    expect(own.filter(function (color) {
+    expect(own.normal.filter(function (color) {
       return brand.includes(color);
     }), 'the brand focus colors differ from the template\'s own').toEqual([]);
     for (const family of FAMILIES) {
@@ -283,30 +298,11 @@ for (const profile of PROFILES) {
         return entry.state;
       }));
       branded.forEach(function (entry, index) {
-        const label = family + ' / ' + entry.state + ': ';
+        const label = family + ' / ' + entry.component + ' / ' + entry.state + ': ';
         reached.focusables += entry.colors.some(function (color) {
           return brand.includes(color);
         }) ? 1 : 0;
-        if (!entry.changed) {
-          wrong.push(label + 'focus draws nothing');
-        }
-        if (entry.browserRing) {
-          wrong.push(label + 'focus draws the browser ring');
-        }
-        const leaked = entry.colors.filter(function (color) {
-          return own.includes(color);
-        });
-        if (leaked.length > 0) {
-          wrong.push(label + 'focus still draws the template color ' + JSON.stringify(leaked));
-        }
-        const expectsBrand = unbranded[index].colors.some(function (color) {
-          return own.includes(color);
-        });
-        if (expectsBrand && !entry.colors.some(function (color) {
-          return brand.includes(color);
-        })) {
-          wrong.push(label + 'focus draws ' + JSON.stringify(entry.colors) + ', not the brand color');
-        }
+        wrong.push.apply(wrong, focusBrandIssues(unbranded[index], entry, own, brandedPalette).map(issue => label + issue));
       });
     }
     expect(wrong).toEqual([]);

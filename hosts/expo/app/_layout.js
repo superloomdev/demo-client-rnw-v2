@@ -4,6 +4,8 @@
 // ?profile= (or ?theme=, the walker's name for it), &scheme=, &brand=;
 // the default profile is used otherwise.
 import { Stack, useGlobalSearchParams } from 'expo-router';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { LibProvider, useLib } from '../../../src/app-core/contexts/lib-context.js';
 import navigationAdapter from '../adapters/navigation.js';
 import fontsAdapter from '../adapters/fonts.js';
@@ -16,6 +18,28 @@ const WALK_SERVER = process.env.EXPO_PUBLIC_WALK_SERVER || null;
 
 // Stable adapter set: LibProvider memoizes the container on this reference
 const ADAPTERS = { Navigation: navigationAdapter, Fonts: fontsAdapter };
+
+
+// The native frame: the device's safe area and status bar themed to the
+// selected scheme, so no route's content slides under the notch and the
+// status text reads against the page. Renders below the ThemeProvider -
+// under the autopilot's waiting state there is no theme and the frame
+// draws a plain safe area
+function NativeFrame (props) {
+
+  const Lib = useLib();
+  const React = Lib.React;
+  const ctx = Lib.ThemeContext.useThemeController();
+  const template = ctx ? Lib.Themes.profiles[ctx.profileName].schemes[ctx.schemeName] : null;
+
+  return React.createElement(SafeAreaView, {
+    edges: ['top', 'right', 'bottom', 'left'],
+    style: { flex: 1, backgroundColor: ctx ? ctx.theme['color.background'] : undefined }
+  },
+  React.createElement(StatusBar, { style: template && template.polarity === 'dark' ? 'light' : 'dark' }),
+  props.children);
+
+}
 
 
 // Inner boot: hold render until host fonts are ready, then provide the theme
@@ -47,16 +71,21 @@ function Boot () {
     return null;
   }
 
-  // A gate build walks under the server's command; nothing else renders
+  // A gate build walks under the server's command; nothing else renders.
+  // The frame is injected so it can sit inside the autopilot's own
+  // command ThemeProvider
   if (WALK_SERVER) {
-    return <Autopilot server={WALK_SERVER} />;
+    return <Autopilot server={WALK_SERVER} Frame={NativeFrame} />;
   }
 
-  // Provide the selected theme to every route
+  // Provide the selected theme to every route, inside the native frame;
+  // the Stack itself stays transparent and the themed Scene draws the page
   const { ThemeProvider } = Lib.ThemeContext;
   return (
     <ThemeProvider profile={params.profile || params.theme} scheme={params.scheme} brand={params.brand}>
-      <Stack screenOptions={{ headerShown: false }} />
+      <NativeFrame>
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: 'transparent' } }} />
+      </NativeFrame>
     </ThemeProvider>
   );
 
@@ -65,8 +94,10 @@ function Boot () {
 
 export default function RootLayout () {
   return (
-    <LibProvider adapters={ADAPTERS}>
-      <Boot />
-    </LibProvider>
+    <SafeAreaProvider>
+      <LibProvider adapters={ADAPTERS}>
+        <Boot />
+      </LibProvider>
+    </SafeAreaProvider>
   );
 }

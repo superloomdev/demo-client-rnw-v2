@@ -6,7 +6,8 @@ import { expect, test } from '@playwright/test';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { PROFILES, catalog, openPage } from './helpers/showcase.js';
+import { catalog, openPage } from './helpers/showcase.js';
+import { reportName, WALK_CASES } from '../scripts/walk-matrix.js';
 
 // The native gate's web baseline must see the same room a device's grid
 // leaves a cell: WALK_VIEWPORT reruns this spec at that viewport width. The
@@ -28,16 +29,19 @@ const EXPECTED_CELLS = catalog.reduce(function (sum, entry) {
 }, 0);
 
 
-for (const profile of PROFILES) {
-  test(profile + ': the walker measures every cell and delivers its report', async function ({ page }) {
-    const errors = await openPage(page, '/walk?theme=' + profile + '&report=' + encodeURIComponent('http://localhost:8787/report'));
+for (const entry of WALK_CASES) {
+  const profile = entry.theme;
+  const scheme = entry.scheme;
+  test(profile + '/' + scheme + ': the walker measures every cell and delivers its report', async function ({ page }) {
+    const errors = await openPage(page, '/walk?theme=' + profile + '&scheme=' + scheme + '&report=' + encodeURIComponent('http://localhost:8787/report'));
     await expect(page.getByTestId('walk-status')).toContainText('walk: sent', { timeout: 20000 });
-    const file = join(WALK_OUT, 'web-' + profile + '.json');
+    const file = join(WALK_OUT, reportName({ platform: 'web', theme: profile, scheme: scheme }));
     expect(existsSync(file), file).toBe(true);
     const report = JSON.parse(readFileSync(file, 'utf8'));
     expect(report.schema).toBe(1);
     expect(report.platform).toBe('web');
     expect(report.theme).toBe(profile);
+    expect(report.scheme).toBe(scheme);
     expect(report.errors).toEqual([]);
     expect(report.expectedCells).toBe(EXPECTED_CELLS);
     expect(report.cells.length).toBe(EXPECTED_CELLS);

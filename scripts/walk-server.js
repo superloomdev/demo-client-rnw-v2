@@ -1,7 +1,7 @@
 // Info: Receives walker reports and holds the current walk command.
-// `POST /report` writes the JSON body to `<out>/<platform>-<theme>[-<family>].json`
+// `POST /report` writes `<platform>-<theme>-<scheme>[-<brand>][-<family>].json`
 // and answers 200 with the file name; `GET /health` answers 200; `GET /reports`
-// lists what was received. `POST /command` stores `{ theme, family }` (or
+// lists what was received. `POST /command` stores `{ theme, scheme, family }` (or
 // `null`) and `GET /command` returns it: an app in autopilot mode polls it
 // instead of receiving a deep link (iOS confirms custom-scheme links with a
 // dialog no simulator command can tap). CORS is open so the web walker (a
@@ -13,6 +13,8 @@
 import { createServer } from 'node:http';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+
+import { reportName } from './walk-matrix.js';
 
 const arg = function (flag, fallback) {
   const index = process.argv.indexOf(flag);
@@ -96,7 +98,14 @@ const server = createServer(function (req, res) {
         res.end('body is not JSON');
         return;
       }
-      const name = [report.platform, report.theme].concat(report.family ? [report.family] : []).join('-') + '.json';
+      let name;
+      try {
+        name = reportName(report);
+      } catch (error) {
+        res.writeHead(400, CORS);
+        res.end(error.message);
+        return;
+      }
       writeFileSync(join(OUT, name), JSON.stringify(report, null, 2) + '\n');
       received.push(name);
       process.stdout.write('walk-server: received ' + name + '\n');
