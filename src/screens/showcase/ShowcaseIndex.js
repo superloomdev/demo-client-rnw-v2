@@ -31,7 +31,7 @@ export default function ShowcaseIndex () {
 
   // Render the progress line, the family links and the sample section
   return React.createElement(Scene, null,
-    React.createElement(ScrollView, { testID: 'showcase-index', contentContainerStyle: { padding: 24, gap: 16 } },
+    React.createElement(ScrollView, { testID: 'showcase-index', dataSet: { form: ctx.resolvedForm, adaptive: ctx.adaptive, textScale: String(ctx.textScale), dir: ctx.dir }, contentContainerStyle: { padding: 24, gap: 16 } },
       React.createElement(R.Stack, null,
         React.createElement(R.Heading, { children: 'Components' }),
         React.createElement(R.Text, { testID: 'showcase-selection', children: ctx.profileName + ' / ' + ctx.schemeName + (ctx.brandName ? ' + ' + ctx.brandName : '') }),

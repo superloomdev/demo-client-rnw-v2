@@ -16,13 +16,14 @@ medium, 24 on expanded).
 
 @param {Object} page - Playwright page
 @param {String} query - The showcase query
+@param {Object} build - The build the measurement expects
 
 @return {Promise<Number>} - px height
 *********************************************************************/
-async function checkboxHeight (page, query) {
+async function checkboxHeight (page, query, build) {
 
   await openPage(page, '/showcase/Checkbox?' + query);
-  await waitForFamily(page, 'Checkbox');
+  await waitForFamily(page, 'Checkbox', build);
   return page.evaluate(function () {
     const box = document.querySelector('[data-cell="true"] [role="checkbox"]');
     return Math.round(box.getBoundingClientRect().height * 100) / 100;
@@ -39,10 +40,10 @@ The computed background color of the scene root for a query.
 
 @return {Promise<String>} - `rgb(r, g, b)`
 *********************************************************************/
-async function sceneBackground (page, query) {
+async function sceneBackground (page, query, build) {
 
   await openPage(page, '/showcase/Button?' + query);
-  await waitForFamily(page, 'Button');
+  await waitForFamily(page, 'Button', build);
   return page.evaluate(function () {
     return window.getComputedStyle(document.querySelector('[data-testid="scene"]')).backgroundColor;
   });
@@ -82,22 +83,27 @@ test('the brand parameter applies the profile\'s brand layer', async function ({
 test('the form parameter resolves the window-independent class', async function ({ page }) {
   // The press-target floor is 48 on compact, 24 on expanded
   await page.setViewportSize({ width: 1280, height: 720 });
-  expect(await checkboxHeight(page, 'profile=carbon&form=compact')).toBe(48);
-  expect(await checkboxHeight(page, 'profile=carbon&form=expanded')).toBe(24);
+  expect(await checkboxHeight(page, 'profile=carbon&form=compact', { form: 'compact' })).toBe(48);
+  expect(await checkboxHeight(page, 'profile=carbon&form=expanded', { form: 'expanded' })).toBe(24);
 });
 
 test('the adaptive parameter ignores the form variant at fixed', async function ({ page }) {
-  // At a compact width: auto applies the variant's floor (48), fixed keeps the expanded base (24)
+  // At a compact width: auto applies the variant's floor (48), fixed keeps
+  // the expanded base (24). The class assertion names the resolved form if
+  // the width resolves to a different class than this pin assumes
   await page.setViewportSize({ width: 375, height: 720 });
-  expect(await checkboxHeight(page, 'profile=carbon&adaptive=auto')).toBe(48);
-  expect(await checkboxHeight(page, 'profile=carbon&adaptive=fixed')).toBe(24);
+  await openPage(page, '/showcase/Checkbox?profile=carbon');
+  await waitForFamily(page, 'Checkbox');
+  await expect(page.locator('[data-testid="family-Checkbox"]')).toHaveAttribute('data-form', 'compact');
+  expect(await checkboxHeight(page, 'profile=carbon&adaptive=auto', { form: 'compact', adaptive: 'auto' })).toBe(48);
+  expect(await checkboxHeight(page, 'profile=carbon&adaptive=fixed', { form: 'compact', adaptive: 'fixed' })).toBe(24);
 });
 
 test('the textScale parameter multiplies type sets', async function ({ page }) {
   // carbon label01: 12px at scale 1, 24px at scale 2 (the theme maximum)
   const read = async function (scale) {
     await openPage(page, '/showcase/Switch?profile=carbon&textScale=' + scale);
-    await waitForFamily(page, 'Switch');
+    await waitForFamily(page, 'Switch', { textScale: String(scale) });
     return page.evaluate(function () {
       const label = Array.from(document.querySelectorAll('[data-cell="true"] *')).find(function (node) {
         return node.children.length === 0 && node.textContent.trim() === 'Off';
@@ -111,12 +117,12 @@ test('the textScale parameter multiplies type sets', async function ({ page }) {
 
 test('the dir parameter reaches the document direction', async function ({ page }) {
   await openPage(page, '/showcase/Button?profile=carbon');
-  await waitForFamily(page, 'Button');
+  await waitForFamily(page, 'Button', { dir: 'ltr' });
   expect(await page.evaluate(function () {
     return document.documentElement.dir;
   })).toBe('ltr');
   await openPage(page, '/showcase/Button?profile=carbon&dir=rtl');
-  await waitForFamily(page, 'Button');
+  await waitForFamily(page, 'Button', { dir: 'rtl' });
   expect(await page.evaluate(function () {
     return document.documentElement.dir;
   })).toBe('rtl');

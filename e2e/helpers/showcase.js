@@ -61,7 +61,7 @@ Wait until a family page has rendered every cell it should.
 
 @return {Promise<Number>} - The expected cell count
 *********************************************************************/
-export async function waitForFamily (page, family) {
+export async function waitForFamily (page, family, build) {
 
   const expected = catalog.filter(function (entry) {
     return entry.family === family;
@@ -71,8 +71,38 @@ export async function waitForFamily (page, family) {
     }).length;
   }, 0);
   await expect(page.locator('[data-cell="true"]')).toHaveCount(expected, { timeout: 20000 });
+  if (build !== undefined) {
+    await waitForBuild(page, '[data-testid="family-' + family + '"]', build);
+  }
 
   return expected;
+
+}
+
+
+/********************************************************************
+Wait until the element matching a selector reports the expected build:
+its data-form, data-adaptive, data-textScale or data-dir attribute reads
+the given value. The page renders once before the window-derived form
+class and the provider's options rebuild settle, so a measurement that
+skips this wait can read the first paint. Playwright's attribute
+expectation names the actual value when it fails.
+
+@param {Object} page     - Playwright page
+@param {String} selector - Selector of the build-reporting element
+@param {Object} build    - Expected values: form, adaptive, textScale, dir
+
+@return {Promise<void>}
+*********************************************************************/
+export async function waitForBuild (page, selector, build) {
+
+  for (const key of Object.keys(build)) {
+    // react-native-web renders dataSet keys kebab-cased (textScale -> data-text-scale)
+    const attribute = 'data-' + key.replace(/[A-Z]/g, function (letter) {
+      return '-' + letter.toLowerCase();
+    });
+    await expect(page.locator(selector)).toHaveAttribute(attribute, String(build[key]), { timeout: 20000 });
+  }
 
 }
 

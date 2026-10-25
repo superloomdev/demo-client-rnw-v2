@@ -27,9 +27,11 @@ export default function Scene (props) {
   const ctx = Lib.ThemeContext.useThemeController();
 
   // Render the themed page with the explorer's control strip at the top and
-  // the route's local layer host confined inside
+  // the route's local layer host confined inside. The root reports the
+  // resolved build so a gate can wait for the state it measures
   return React.createElement(View, {
     testID: props.testID === undefined ? 'scene' : props.testID,
+    dataSet: { form: ctx.resolvedForm, adaptive: ctx.adaptive, textScale: String(ctx.textScale), dir: ctx.dir },
     style: { flex: 1, position: 'relative', backgroundColor: ctx.theme['color.background'] }
   },
   React.createElement(ExplorerBar),

@@ -50,7 +50,7 @@ for (const group of GROUPS) {
       });
     });
     const errors = await openPage(page, '/showcase/' + group.family + '?profile=carbon');
-    await waitForFamily(page, group.family).catch(function () {
+    await waitForFamily(page, group.family, { textScale: '1' }).catch(function () {
       // A family with no built rows has no cell-grid to wait for
     });
     expect(await page.getByTestId('family-title').count()).toBeGreaterThan(0);

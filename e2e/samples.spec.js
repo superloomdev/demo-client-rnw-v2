@@ -6,7 +6,7 @@ import { expect, test } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { openPage } from './helpers/showcase.js';
+import { openPage, waitForBuild } from './helpers/showcase.js';
 
 const OUT = join(process.cwd(), 'test-results', 'showcase', 'samples');
 const SCREENS = ['sign-in', 'settings', 'records'];
@@ -54,8 +54,11 @@ test('the settings text-scale slider doubles the sign-in heading through shared 
   const slider = page.getByRole('slider').first();
   await slider.focus();
   await slider.press('End');
+  // The scene root reports the build: the slider reached 2 before leaving
+  await waitForBuild(page, '[data-testid="sample-settings"]', { textScale: '2' });
   // The shared explorer state carries textScale to the next route
   await openPage(page, '/samples/sign-in?profile=carbon&textScale=2');
+  await waitForBuild(page, '[data-testid="sample-sign-in"]', { textScale: '2' });
   const scaled = await page.evaluate(function () {
     const headings = Array.from(document.querySelectorAll('[role="heading"]'));
     return parseFloat(window.getComputedStyle(headings[0]).fontSize);

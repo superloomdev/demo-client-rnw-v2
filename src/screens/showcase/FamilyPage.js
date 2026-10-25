@@ -45,7 +45,7 @@ export default function FamilyPage (props) {
   return React.createElement(Scene, null,
     React.createElement(ScrollView, {
       testID: 'family-' + props.family,
-      dataSet: { family: props.family, profile: ctx.profileName, scheme: ctx.schemeName, brand: ctx.brandName || '' },
+      dataSet: { family: props.family, profile: ctx.profileName, scheme: ctx.schemeName, brand: ctx.brandName || '', form: ctx.resolvedForm, adaptive: ctx.adaptive, textScale: String(ctx.textScale), dir: ctx.dir },
       contentContainerStyle: { padding: 24, gap: 16 }
     },
     React.createElement(R.Heading, { testID: 'family-title', children: props.family + ' ' + group.built + '/' + group.total }),
