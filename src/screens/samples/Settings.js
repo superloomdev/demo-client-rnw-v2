@@ -47,12 +47,12 @@ export default function Settings () {
   if (!ready) {
     return React.createElement(Scene, { testID: 'sample-settings' },
       React.createElement(Lib.ReactNative.ScrollView, { contentContainerStyle: { padding: 24, gap: 16 } },
-        React.createElement(R.SkeletonText, { heading: true, paragraph: true })));
+        React.createElement(R.SkeletonText, { heading: true, paragraph: true, testID: 'sample-settings-skeleton' })));
   }
 
   // Render the bound and the local controls inside the route's own scene
   return React.createElement(Scene, { testID: 'sample-settings' },
-    React.createElement(Lib.ReactNative.ScrollView, { contentContainerStyle: { padding: 24, gap: 16 } },
+    React.createElement(Lib.ReactNative.ScrollView, { testID: 'sample-settings-loaded', contentContainerStyle: { padding: 24, gap: 16 } },
       React.createElement(R.Heading, { children: 'Settings' }),
       React.createElement(R.Section, { level: 2 },
         React.createElement(R.Heading, { children: 'Appearance' }),

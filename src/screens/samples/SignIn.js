@@ -52,15 +52,18 @@ export default function SignIn () {
                 setTouched(true);
               }
             }),
-            React.createElement(R.HStack, null,
+            React.createElement(R.VStack, null,
+              React.createElement(R.HStack, { gap: 2 },
+                React.createElement(Lib.ReactNative.View, { style: { flex: 1 } },
+                  React.createElement(R.FormLabel, { children: 'Password' })),
+                React.createElement(R.Tooltip, { label: 'At least eight characters' },
+                  React.createElement(R.IconButton, { icon: 'info', label: 'Password help', kind: 'ghost' }))),
               React.createElement(R.PasswordInput, {
-                label: 'Password', placeholder: 'Password', value: password,
+                placeholder: 'Password', value: password, accessibilityLabel: 'Password',
                 onChangeText: function (value) {
                   setPassword(value);
                 }
-              }),
-              React.createElement(R.Tooltip, { label: 'At least eight characters' },
-                React.createElement(R.IconButton, { icon: 'info', label: 'Password help' }))),
+              })),
             React.createElement(R.Checkbox, {
               label: 'Remember me', checked: remember,
               onChange: function (next) {
@@ -68,6 +71,7 @@ export default function SignIn () {
               }
             }))),
         React.createElement(R.ButtonSet, {
+          stacked: ctx.resolvedForm === 'compact',
           items: [
             { children: 'Create account', kind: 'secondary' },
             { children: 'Sign in', kind: 'primary', onPress: submit }

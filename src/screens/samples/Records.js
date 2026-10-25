@@ -81,6 +81,7 @@ export default function Records () {
     };
   };
 
+  // Library follow-up (plan 0160 Loop-backs): Menu does not take focus from a bare trigger yet.
   // An opened menu takes the focus so Escape and the arrows reach it. The
   // layer host mounts the surface passes after the trigger's set state, so
   // the focus lands when the first menuitem exists, not at a fixed delay.
@@ -125,32 +126,37 @@ export default function Records () {
             onChange: toggleStatus(status)
           });
         })),
-      React.createElement(R.Layer, { level: 1 },
+      React.createElement(R.Stack, { gap: 4 },
         Lib.Utils.isEmptyArray(visible)
           ? React.createElement(R.Tag, { children: 'No records', testID: 'records-empty' })
           : visible.map(function (record, index) {
             const absolute = current * PAGE_SIZE + index;
-            return React.createElement(R.HStack, { key: record.title, testID: 'record-' + absolute },
-              React.createElement(R.Link, {
-                children: record.title,
-                testID: 'record-title-' + absolute,
-                onPress: function () {
-                  setDetail(record);
-                }
-              }),
-              React.createElement(R.Text, { children: record.owner }),
-              React.createElement(R.Text, { children: record.updated }),
-              React.createElement(R.Tag, { children: record.status }),
-              React.createElement(R.ProgressBar, { label: record.title, value: record.percent }),
-              React.createElement(View, {
-                ref: function (node) {
-                  anchors.current[absolute] = node;
-                }
-              },
-              React.createElement(R.IconButton, {
-                icon: 'overflow_vertical', label: 'more',
-                onPress: openMenu(absolute)
-              })));
+            return React.createElement(R.Layer, { key: record.title, testID: 'record-' + absolute },
+              React.createElement(R.Stack, { gap: 3 },
+                React.createElement(R.HStack, { gap: 4 },
+                  React.createElement(View, { style: { flex: 1 } },
+                    React.createElement(R.Link, {
+                      children: record.title,
+                      testID: 'record-title-' + absolute,
+                      onPress: function () {
+                        setDetail(record);
+                      }
+                    })),
+                  React.createElement(R.Tag, { children: record.status }),
+                  React.createElement(View, {
+                    ref: function (node) {
+                      anchors.current[absolute] = node;
+                    }
+                  },
+                  React.createElement(R.IconButton, {
+                    icon: 'overflow_vertical', label: 'more', kind: 'ghost',
+                    onPress: openMenu(absolute)
+                  }))),
+                React.createElement(R.Text, { children: record.owner + ' \u00b7 ' + record.updated }),
+                React.createElement(R.ProgressBar, {
+                  accessibilityLabel: record.title + ' progress',
+                  value: record.percent
+                })));
           })),
       React.createElement(R.HStack, null,
         React.createElement(R.ButtonSet, {

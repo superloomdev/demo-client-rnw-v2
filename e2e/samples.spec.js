@@ -22,7 +22,15 @@ for (const screen of SCREENS) {
         await page.setViewportSize({ width: width, height: 720 });
         const errors = await openPage(page, '/samples/' + screen + '?profile=' + profile);
         await expect(page.getByTestId('sample-' + screen).first()).toBeVisible({ timeout: 15000 });
-        await page.waitForTimeout(900);
+        if (screen === 'settings') {
+          // The skeleton prelude is a state of its own: it must be present
+          // on arrival, then gone once the loaded scene mounts
+          await expect(page.getByTestId('sample-settings-skeleton')).toBeVisible();
+          await page.getByTestId('sample-settings-loaded').waitFor();
+          await expect(page.getByTestId('sample-settings-skeleton')).toHaveCount(0);
+        } else {
+          await page.waitForTimeout(900);
+        }
         await page.screenshot({ path: join(OUT, screen + '-' + profile + '-' + width + '.png'), fullPage: true });
         expect(errors).toEqual([]);
       });
