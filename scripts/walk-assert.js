@@ -117,6 +117,16 @@ for (const entry of CASES) {
       check(false, theme + ': web gridWidth ' + web.gridWidth + ' != native ' + report.gridWidth + ': not the same room');
       continue;
     }
+    // The form class must match: a compact native walk proves nothing
+    // about an expanded web reference
+    if (report.resolvedForm === null || report.resolvedForm === undefined) {
+      check(false, theme + ': native report carries no resolved form class');
+      continue;
+    }
+    if (web.resolvedForm !== report.resolvedForm) {
+      check(false, theme + ': web resolvedForm ' + web.resolvedForm + ' != native ' + report.resolvedForm + ': not the same class');
+      continue;
+    }
     for (const cell of report.cells) {
       const key = cell.component + '/' + cell.state;
       const other = webCells[key];

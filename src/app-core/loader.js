@@ -12,7 +12,7 @@ import jsHelperDebug from '@superloomdev/js-helper-debug';
 import jsClientHelperThemer from '@superloomdev/js-client-helper-themer';
 import jsClientHelperThemerExtReact from '@superloomdev/js-client-helper-themer-ext-react';
 import jsClientHelperFont from '@superloomdev/js-client-helper-font';
-import { createSystem } from '@superloomdev/rnw-components';
+import { createSystem, resolveForm, FORM_CLASSES } from '@superloomdev/rnw-components';
 import * as factories from '@superloomdev/rnw-components/all';
 import { catalog } from '@superloomdev/rnw-components/catalog';
 import defaultProfile from '@superloomdev/js-client-helper-themer-template-default';
@@ -85,7 +85,10 @@ export default function loader (adapters) {
   // Navigation surface from the host
   Lib.Navigation = adapters.Navigation(Lib, {});
 
-  // Theme data: one profile per template package, plus the sparse brand layers
+  // Theme data: one profile per template package. Each profile's brand set is
+  // the template's own `brands` plus the demo's layers; a demo brand that
+  // names a template brand with different content is a programmer error, an
+  // identical copy (the template upstreamed the demo's brand) merges cleanly.
   Lib.Themes = {
     profiles: {
       default: defaultProfile,
@@ -94,11 +97,27 @@ export default function loader (adapters) {
     },
     brands: BRAND_LAYERS
   };
+  for (const name of Object.keys(Lib.Themes.profiles)) {
+    const profile = Lib.Themes.profiles[name];
+    const merged = Object.assign({}, profile.brands);
+    for (const key of Object.keys(BRAND_LAYERS)) {
+      const templateBrand = merged[key];
+      if (templateBrand === undefined) {
+        merged[key] = BRAND_LAYERS[key];
+      } else if (JSON.stringify(templateBrand) !== JSON.stringify(BRAND_LAYERS[key])) {
+        throw new TypeError('themes: demo brand "' + key + '" collides with profile "' + name + '" template brand');
+      }
+    }
+    // The template package is frozen; the profile entry is rebuilt, not mutated
+    Lib.Themes.profiles[name] = Object.assign({}, profile, { brands: merged });
+  }
 
   // The component library: its one entry point, every factory it exports,
   // and the catalog (family, tier, platform, flags, sample states per component)
   Lib.Components = {
     createSystem: createSystem,
+    resolveForm: resolveForm,
+    FORM_CLASSES: FORM_CLASSES,
     factories: factories,
     catalog: catalog
   };

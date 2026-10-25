@@ -11,7 +11,7 @@ import { BRAND_LAYERS } from '../src/themes/brand-layers.js';
 import { focusBrandIssues } from './helpers/focus-brand.js';
 import { FAMILIES, PROFILES, catalog, openPage, waitForFamily } from './helpers/showcase.js';
 
-const ACME = BRAND_LAYERS.acme.tokens;
+const ACME = BRAND_LAYERS.acme.light.tokens;
 
 // The sans family each profile names on its own; the brand replaces it
 const PROFILE_SANS = { default: 'IBM Plex Sans', carbon: 'IBM Plex Sans', material: 'Roboto' };
@@ -316,6 +316,67 @@ for (const profile of PROFILES) {
       expect(reached.focusables).toBeGreaterThan(0);
     }
     test.info().annotations.push({ type: 'brand', description: profile + ' + acme: ' + reached.texts + ' texts, ' + reached.focusables + ' focusables, ' + reached.corners + ' corners' });
+  });
+
+}
+
+
+// The template's own sample brands reach the render the same way: carbon's
+// `superloom` moves the interactive color to the purple ramp, and
+// material's `rounded` opens fields to outlines and rounds square corners
+for (const reach of [
+  {
+    name: 'carbon + superloom',
+    query: 'profile=carbon&brand=superloom',
+    tokens: { 'color.interactive': '#8a3ffc', 'color.button_primary': '#8a3ffc' },
+    family: 'Button'
+  },
+  {
+    name: 'material + rounded',
+    query: 'profile=material&brand=rounded',
+    tokens: { 'shape.radius_00': 8 },
+    family: 'Tag'
+  }
+]) {
+
+  test(reach.name + ': the template brand reaches the built theme', async function ({ page }) {
+    const errors = await openPage(page, '/walk/Icon?' + reach.query);
+    await expect(page.getByTestId('walk-status')).toContainText('walk: done');
+    const report = await page.evaluate(function () {
+      return globalThis.__walk;
+    });
+    expect(errors).toEqual([]);
+    for (const name of Object.keys(reach.tokens)) {
+      expect(report.tokens[name] !== undefined ? report.tokens[name] : 'unsampled', name + ' sampled in the report').not.toBe('unsampled');
+    }
+  });
+
+  test(reach.name + ': the template brand reaches the render', async function ({ page }) {
+    const errors = await openPage(page, '/showcase/' + reach.family + '?' + reach.query);
+    await page.getByTestId('family-' + reach.family).waitFor();
+    const rgb = Object.keys(reach.tokens).filter(function (name) {
+      return name.indexOf('color.') === 0;
+    }).map(function (name) {
+      return toRgb(reach.tokens[name]);
+    });
+    if (rgb.length > 0) {
+      const drawn = await page.evaluate(function (colors) {
+        return Array.from(document.querySelectorAll('*')).some(function (node) {
+          const style = window.getComputedStyle(node);
+          return colors.indexOf(style.backgroundColor) !== -1 || colors.indexOf(style.borderTopColor) !== -1 || colors.indexOf(style.color) !== -1;
+        });
+      }, rgb);
+      expect(drawn, 'a brand color is drawn somewhere on the page').toBe(true);
+    }
+    if (reach.tokens['shape.radius_00'] !== undefined) {
+      const radius = await page.evaluate(function (expected) {
+        return Array.from(document.querySelectorAll('[data-cell="true"] *')).map(function (node) {
+          return parseFloat(window.getComputedStyle(node).borderTopLeftRadius) || 0;
+        }).indexOf(expected) !== -1;
+      }, reach.tokens['shape.radius_00']);
+      expect(radius, 'a corner draws the brand radius').toBe(true);
+    }
+    expect(errors).toEqual([]);
   });
 
 }

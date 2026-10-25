@@ -41,10 +41,23 @@ Append the current theme selection to an app path.
 *********************************************************************/
 export function getHref (path, ctx) {
 
-  // Always carry profile and scheme; carry brand only when one is set
+  // Always carry profile and scheme; carry the explorer's other parameters
+  // only when they diverge from the defaults
   const query = ['profile=' + encodeURIComponent(ctx.profileName), 'scheme=' + encodeURIComponent(ctx.schemeName)];
   if (ctx.brandName) {
     query.push('brand=' + encodeURIComponent(ctx.brandName));
+  }
+  if (ctx.form) {
+    query.push('form=' + encodeURIComponent(ctx.form));
+  }
+  if (ctx.adaptive === 'fixed') {
+    query.push('adaptive=fixed');
+  }
+  if (ctx.textScale !== undefined && ctx.textScale !== null && ctx.textScale !== 1) {
+    query.push('textScale=' + encodeURIComponent(ctx.textScale));
+  }
+  if (ctx.dir === 'rtl') {
+    query.push('dir=rtl');
   }
 
   // Return the path with its query

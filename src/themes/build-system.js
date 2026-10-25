@@ -23,14 +23,17 @@ export const THEME_PLATFORM = 'native';
 /********************************************************************
 Build the component system from a built theme.
 
-@param {Object}   Lib        - the dependency container
-@param {Object}   built      - the Themer's buildTheme result (native)
-@param {Function} rederive   - called when an async font load lands
-@param {String}   breakpoint - a contract breakpoint name
+@param {Object}   Lib              - the dependency container
+@param {Object}   built            - the Themer's buildTheme result (native)
+@param {Function} rederive         - called when an async font load lands
+@param {String}   breakpoint       - a contract breakpoint name
+@param {Object}   [options]        - system seam inputs (optional)
+@param {Number}   [options.textScale]    - the host's text scale (default 1)
+@param {Function} [options.onDiagnostic] - createSystem diagnostic sink
 
 @return {Object} - { Registry, tokens, fallbacks }
 *********************************************************************/
-export function buildSystem (Lib, built, rederive, breakpoint) {
+export function buildSystem (Lib, built, rederive, breakpoint, options) {
 
   // Init a copy of the token map the font fallback may write into
   const tokens = Object.assign({}, built.tokens);
@@ -71,15 +74,21 @@ export function buildSystem (Lib, built, rederive, breakpoint) {
     Lib.Debug.warn('theme: host does not carry ' + fallbacks.join(', ') + '; drawing in System');
   }
 
-  // Build the system through the library's one entry point
+  // Build the system through the library's one entry point. The platform
+  // seam passes the host's OS widgets as adapters; the config carries the
+  // host's text scale and the diagnostic sink the walker collects from.
   const Registry = Lib.Components.createSystem({
     React: Lib.React,
     ReactNative: Lib.ReactNative,
     Svg: Lib.Svg,
     Utils: Lib.Utils,
     Debug: Lib.Debug,
-    Themer: Lib.Themer
-  }, {}, Object.assign({}, built, { tokens: tokens }), breakpoint, Lib.Components.factories);
+    Themer: Lib.Themer,
+    adapters: { Switch: Lib.ReactNative.Switch }
+  }, {
+    textScale: options && options.textScale,
+    onDiagnostic: options && options.onDiagnostic
+  }, Object.assign({}, built, { tokens: tokens }), breakpoint, Lib.Components.factories);
 
   // Return the registry, the tokens it was built from and what fell back
   return { Registry: Registry, tokens: tokens, fallbacks: fallbacks };

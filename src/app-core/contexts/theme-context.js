@@ -69,11 +69,15 @@ const ThemeContext = {
   *********************************************************************/
   ThemeProvider: function (props) {
 
-    // Init the three selections
+    // Init the three selections and the adaptive seam's four inputs
     const profiles = Lib.Themes.profiles;
     const [profileName, setProfileName] = React.useState(props.profile || Lib.Config.theme.DEFAULT_PROFILE);
     const [schemeName, setSchemeName] = React.useState(props.scheme || null);
     const [brandName, setBrandName] = React.useState(props.brand || null);
+    const [formName, setFormName] = React.useState(props.form || null);
+    const [adaptive, setAdaptive] = React.useState(props.adaptive || 'auto');
+    const [textScaleName, setTextScaleName] = React.useState(props.textScale === undefined ? null : Number(props.textScale));
+    const [dirName, setDirName] = React.useState(props.dir || 'ltr');
 
     // Follow the props: a host that re-renders the provider with a new
     // selection (a deep link reaching a running app, a URL change) re-derives
@@ -82,7 +86,11 @@ const ThemeContext = {
       setProfileName(props.profile || Lib.Config.theme.DEFAULT_PROFILE);
       setSchemeName(props.scheme || null);
       setBrandName(props.brand || null);
-    }, [props.profile, props.scheme, props.brand]);
+      setFormName(props.form || null);
+      setAdaptive(props.adaptive || 'auto');
+      setTextScaleName(props.textScale === undefined ? null : Number(props.textScale));
+      setDirName(props.dir || 'ltr');
+    }, [props.profile, props.scheme, props.brand, props.form, props.adaptive, props.textScale, props.dir]);
 
     // Init the re-derive epoch an async font load bumps
     const [epoch, setEpoch] = React.useState(0);
@@ -103,11 +111,60 @@ const ThemeContext = {
       throw new TypeError('theme-context: profile "' + profileName + '" has no scheme "' + resolvedScheme + '"');
     }
 
-    // The brand is the only layer; memoized so the extension sees a stable reference
+    // Resolve the platform seam once: Platform.OS on every host (a desktop
+    // hint maps to macos/windows through Config.desktop when a host sets it)
+    const platform = (Lib.Config.desktop && Lib.Config.desktop.platform) || Lib.ReactNative.Platform.OS;
+
+    // Resolve the form class: an explicit selection wins; otherwise the
+    // window's width decides, re-resolved on every resize
+    const windowWidth = (Lib.ReactNative.useWindowDimensions || function () {
+      return { width: Lib.ReactNative.Dimensions.get('window').width };
+    })().width;
+    const resolvedForm = formName || Lib.Components.resolveForm(windowWidth);
+
+    // Resolve the text scale: an explicit selection wins; otherwise the
+    // host's own scale applies (OS font scale on native, root font size on web)
+    const hostScale = platform === 'web'
+      ? (typeof document !== 'undefined' && document.documentElement ? parseFloat(globalThis.getComputedStyle(document.documentElement).fontSize) / 16 : 1)
+      : (Lib.ReactNative.PixelRatio && Lib.ReactNative.PixelRatio.getFontScale ? Lib.ReactNative.PixelRatio.getFontScale() : 1);
+    const resolvedTextScale = textScaleName === null ? hostScale : textScaleName;
+
+    // Diagnostics are collected per session and reach the walker report;
+    // each record also lands in the debug log at debug level
+    const diagnosticsRef = React.useRef([]);
+    const onDiagnostic = React.useCallback(function (record) {
+      diagnosticsRef.current = diagnosticsRef.current.concat([record]);
+      Lib.Debug.debug('theme diagnostic: ' + JSON.stringify(record));
+    }, []);
+
+    // Apply the direction to the root it controls: the dir attribute on the
+    // web document (react-native-web's locale reading follows it); a native
+    // host re-reads I18nManager on restart, so the controller just exposes it
+    React.useEffect(function () {
+      if (platform === 'web' && typeof document !== 'undefined' && document.documentElement) {
+        document.documentElement.dir = dirName;
+      }
+    }, [platform, dirName]);
+
+    // The brand is the only layer, picked by the built scheme's polarity and
+    // drawn from the profile's own brand set (the template's plus the demo's)
+    const polarity = template.polarity === 'dark' ? 'dark' : 'light';
     const layers = React.useMemo(function () {
-      const brand = brandName ? Lib.Themes.brands[brandName] : null;
-      return brand ? [brand] : [];
-    }, [brandName, epoch]);
+      const brand = brandName ? (profile.brands || {})[brandName] : null;
+      if (brandName !== null && brandName !== undefined && brand === undefined) {
+        throw new TypeError('theme-context: profile "' + profileName + '" has no brand "' + brandName + '"');
+      }
+      return brand ? [brand[polarity] || brand] : [];
+    }, [brandName, profileName, resolvedScheme, polarity, epoch]);
+
+    // The engine options: the resolved form and platform pick the template's
+    // variants; `adaptive: 'fixed'` ignores them entirely
+    const options = React.useMemo(function () {
+      return {
+        variant: { form: resolvedForm, platform: platform },
+        adaptive: adaptive
+      };
+    }, [resolvedForm, platform, adaptive]);
 
     // Stable setters for the controller
     const updateProfile = React.useCallback(function (name) {
@@ -120,10 +177,25 @@ const ThemeContext = {
     const updateBrand = React.useCallback(function (name) {
       setBrandName(name || null);
     }, []);
+    const updateForm = React.useCallback(function (name) {
+      setFormName(name || null);
+    }, []);
+    const updateAdaptive = React.useCallback(function (name) {
+      setAdaptive(name || 'auto');
+    }, []);
+    const updateTextScale = React.useCallback(function (value) {
+      setTextScaleName(value === null || value === undefined ? null : Number(value));
+    }, []);
+    const updateDir = React.useCallback(function (name) {
+      setDirName(name || 'ltr');
+    }, []);
 
     // Transform seam: build the component system from the derived theme
     const transform = React.useCallback(function (built) {
-      const result = buildSystem(Lib, built, rederive, Lib.Config.theme.DEFAULT_BREAKPOINT);
+      const result = buildSystem(Lib, built, rederive, Lib.Config.theme.DEFAULT_BREAKPOINT, {
+        textScale: resolvedTextScale,
+        onDiagnostic: onDiagnostic
+      });
       return {
         Registry: result.Registry,
         theme: result.tokens,
@@ -131,17 +203,29 @@ const ThemeContext = {
         profileName: profileName,
         schemeName: resolvedScheme,
         brandName: brandName,
+        form: formName,
+        resolvedForm: resolvedForm,
+        adaptive: adaptive,
+        textScale: resolvedTextScale,
+        dir: dirName,
+        platform: platform,
+        diagnostics: diagnosticsRef.current,
         updateProfile: updateProfile,
         updateScheme: updateScheme,
-        updateBrand: updateBrand
+        updateBrand: updateBrand,
+        updateForm: updateForm,
+        updateAdaptive: updateAdaptive,
+        updateTextScale: updateTextScale,
+        updateDir: updateDir
       };
-    }, [rederive, profileName, resolvedScheme, brandName, updateProfile, updateScheme, updateBrand]);
+    }, [rederive, profileName, resolvedScheme, brandName, formName, resolvedForm, adaptive, resolvedTextScale, dirName, platform, onDiagnostic, updateProfile, updateScheme, updateBrand, updateForm, updateAdaptive, updateTextScale, updateDir]);
 
     // Render the extension's provider with the app's template, layers and seam
     return React.createElement(Ext.ThemeProvider, {
       template: template,
       layers: layers,
       platform: THEME_PLATFORM,
+      options: options,
       transform: transform
     }, React.createElement(RootHost, null, props.children));
 

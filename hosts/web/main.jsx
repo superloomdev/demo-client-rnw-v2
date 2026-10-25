@@ -15,6 +15,7 @@ import fontsAdapter, { DECLARED_FACES } from './adapters/fonts.js';
 
 import ShowcaseIndex from '../../src/screens/showcase/ShowcaseIndex.js';
 import FamilyPage from '../../src/screens/showcase/FamilyPage.js';
+import SystemWidgetsPage from '../../src/screens/showcase/SystemWidgetsPage.js';
 import Walker from '../../src/screens/walk/Walker.js';
 
 // Stable adapter set: LibProvider memoizes the container on this reference
@@ -27,6 +28,9 @@ function Screen () {
   const segments = window.location.pathname.split('/').filter(Boolean);
   const params = new URLSearchParams(window.location.search);
 
+  if (segments[0] === 'showcase' && segments[1] === 'system-widgets') {
+    return <SystemWidgetsPage />;
+  }
   if (segments[0] === 'showcase' && segments[1]) {
     return <FamilyPage family={decodeURIComponent(segments[1])} />;
   }
@@ -48,9 +52,13 @@ function App () {
 
   return (
     <ThemeProvider
-      profile={params.get('profile') || params.get('theme') || undefined}
+      profile={params.get('profile') || params.get('theme') || params.get('template') || undefined}
       scheme={params.get('scheme') || undefined}
       brand={params.get('brand') || undefined}
+      form={params.get('form') || undefined}
+      adaptive={params.get('adaptive') || undefined}
+      textScale={params.get('textScale') || undefined}
+      dir={params.get('dir') || undefined}
     >
       <Screen />
     </ThemeProvider>
