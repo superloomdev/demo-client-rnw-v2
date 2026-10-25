@@ -16,6 +16,9 @@ import fontsAdapter, { DECLARED_FACES } from './adapters/fonts.js';
 import ShowcaseIndex from '../../src/screens/showcase/ShowcaseIndex.js';
 import FamilyPage from '../../src/screens/showcase/FamilyPage.js';
 import SystemWidgetsPage from '../../src/screens/showcase/SystemWidgetsPage.js';
+import SignIn from '../../src/screens/samples/SignIn.js';
+import Settings from '../../src/screens/samples/Settings.js';
+import Records from '../../src/screens/samples/Records.js';
 import Walker from '../../src/screens/walk/Walker.js';
 
 // Stable adapter set: LibProvider memoizes the container on this reference
@@ -36,6 +39,15 @@ function Screen () {
   }
   if (segments[0] === 'walk') {
     return <Walker family={segments[1] ? decodeURIComponent(segments[1]) : undefined} report={params.get('report') || undefined} />;
+  }
+  if (segments[0] === 'samples' && segments[1] === 'sign-in') {
+    return <SignIn />;
+  }
+  if (segments[0] === 'samples' && segments[1] === 'settings') {
+    return <Settings />;
+  }
+  if (segments[0] === 'samples' && segments[1] === 'records') {
+    return <Records />;
   }
 
   return <ShowcaseIndex />;

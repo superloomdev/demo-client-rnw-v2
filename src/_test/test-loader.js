@@ -15,7 +15,7 @@ import { LibProvider } from '../app-core/contexts/lib-context.js';
 import { buildSystem, THEME_PLATFORM } from '../themes/build-system.js';
 import ShowcaseIndex from '../screens/showcase/ShowcaseIndex.js';
 import FamilyPage from '../screens/showcase/FamilyPage.js';
-import { getFamilies, getHref } from '../screens/showcase/catalog.js';
+import { getFamilies, getHref, getRoster, getTotals } from '../screens/showcase/catalog.js';
 import { CELL_CHROME } from '../screens/showcase/cell-chrome.js';
 import { buildReport } from '../screens/walk/report.js';
 import Walker from '../screens/walk/Walker.js';
@@ -189,8 +189,10 @@ describe('showcase', function () {
       const lines = texts(renderer.toJSON());
       const scheme = Object.keys(Lib.Themes.profiles[profileName].schemes)[0];
       assert.ok(lines.includes(profileName + ' / ' + scheme), lines.join(' | '));
-      for (const group of getFamilies(Lib.Components.catalog)) {
-        assert.ok(lines.includes(group.family + ' (' + group.components.length + ')'), group.family);
+      const totals = getTotals(getRoster(Lib.Components.catalog));
+      assert.ok(lines.includes(totals.built + ' of ' + totals.total + ' components built'), lines.join(' | '));
+      for (const group of getRoster(Lib.Components.catalog)) {
+        assert.ok(lines.includes(group.family + ' ' + group.built + '/' + group.total), group.family);
       }
       await act(async function () {
         renderer.unmount();
