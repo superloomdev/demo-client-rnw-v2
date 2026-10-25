@@ -1,9 +1,18 @@
-// Info: Showcase index: the theme selection in effect and one link per
-// component family in the library's catalog. The family page shows every
-// sample state of every component in that family.
+// Info: Showcase index: the theme selection in effect, the build progress
+// over the whole roster, one link per family with its built/total count
+// and milestone tag, and the sample screens. Composed from the library's
+// own components; host Text appears only where the library has no row.
 import { useLib } from '../../app-core/contexts/lib-context.js';
 import Scene from '../Scene.js';
-import { getFamilies, getHref } from './catalog.js';
+import { getRoster, getTotals, getHref } from './catalog.js';
+import { MILESTONES } from './planned-rows.js';
+
+// The three sample screens of the Samples section
+const SAMPLES = [
+  { name: 'sign-in', title: 'Sign in' },
+  { name: 'settings', title: 'Settings' },
+  { name: 'records', title: 'Records' }
+];
 
 
 export default function ShowcaseIndex () {
@@ -11,23 +20,38 @@ export default function ShowcaseIndex () {
   // Init the container and the theme controller
   const Lib = useLib();
   const React = Lib.React;
-  const { View, Text, ScrollView } = Lib.ReactNative;
+  const { ScrollView } = Lib.ReactNative;
   const Link = Lib.Navigation.Link;
   const ctx = Lib.ThemeContext.useThemeController();
+  const R = ctx.Registry;
 
-  // Group the built components by family
-  const families = getFamilies(Lib.Components.catalog);
+  // Merge the built catalog with the whole roster
+  const groups = getRoster(Lib.Components.catalog);
+  const totals = getTotals(groups);
 
-  // Render the selection line and the family links, inside the route's own scene
+  // Render the progress line, the family links and the sample section
   return React.createElement(Scene, null,
-    React.createElement(ScrollView, { testID: 'showcase-index', contentContainerStyle: { padding: 24, gap: 12 } },
-      React.createElement(Text, { testID: 'showcase-selection', style: { fontSize: 20, fontWeight: '600', color: ctx.theme['color.text_primary'] } },
-        ctx.profileName + ' / ' + ctx.schemeName + (ctx.brandName ? ' + ' + ctx.brandName : '')),
-      React.createElement(Text, { testID: 'showcase-count', style: { color: ctx.theme['color.text_primary'] } }, 'Components: ' + Object.keys(ctx.Registry).length + ' in ' + families.length + ' families'),
-      families.map(function (group) {
-        return React.createElement(View, { key: group.family, testID: 'family-link-' + group.family },
-          React.createElement(Link, { href: getHref('/showcase/' + group.family, ctx) },
-            React.createElement(Text, { style: { color: ctx.theme['color.link_primary'] } }, group.family + ' (' + group.components.length + ')')));
-      })));
+    React.createElement(ScrollView, { testID: 'showcase-index', contentContainerStyle: { padding: 24, gap: 16 } },
+      React.createElement(R.Stack, null,
+        React.createElement(R.Heading, { children: 'Components' }),
+        React.createElement(R.Text, { testID: 'showcase-selection', children: ctx.profileName + ' / ' + ctx.schemeName + (ctx.brandName ? ' + ' + ctx.brandName : '') }),
+        React.createElement(R.Text, { testID: 'showcase-progress', children: totals.built + ' of ' + totals.total + ' components built' }),
+        React.createElement(R.ProgressBar, { label: 'Build progress', value: Math.round(totals.built / totals.total * 100) }),
+        groups.map(function (group) {
+          const milestone = MILESTONES[group.family];
+          return React.createElement(R.HStack, { key: group.family, testID: 'family-link-' + group.family },
+            React.createElement(Link, { href: getHref('/showcase/' + group.family, ctx) },
+              React.createElement(R.Text, { children: group.family + ' ' + group.built + '/' + group.total })),
+            group.built < group.total && milestone
+              ? React.createElement(R.Tag, { children: milestone, size: 'sm' })
+              : null);
+        }),
+        React.createElement(R.Divider),
+        React.createElement(R.Section, { level: 2 },
+          React.createElement(R.Heading, { children: 'Sample screens' }),
+          SAMPLES.map(function (sample) {
+            return React.createElement(Link, { key: sample.name, href: getHref('/samples/' + sample.name, ctx) },
+              React.createElement(R.Text, { testID: 'sample-link-' + sample.name, children: sample.title }));
+          })))));
 
 }

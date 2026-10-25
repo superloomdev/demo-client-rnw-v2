@@ -7,7 +7,7 @@ import { CELL_CHROME } from '../showcase/cell-chrome.js';
 
 // A small token sample the report carries so a brand layer's reach is
 // visible in the artifact without shipping the whole theme
-const TOKEN_SAMPLE = ['color.background', 'color.text_primary', 'color.interactive', 'color.focus', 'color.focus_inverse', 'color.background_inverse', 'shape.radius_04', 'shape.radius_08', 'font.family.sans'];
+const TOKEN_SAMPLE = ['color.background', 'color.text_primary', 'color.interactive', 'color.focus', 'color.focus_inverse', 'color.background_inverse', 'color.button_primary', 'shape.radius_00', 'shape.radius_04', 'shape.radius_08', 'font.family.sans'];
 
 
 /********************************************************************
@@ -48,6 +48,12 @@ export function buildReport (input) {
     theme: input.ctx.profileName,
     scheme: input.ctx.schemeName,
     brand: input.ctx.brandName || null,
+    form: input.ctx.form || null,
+    resolvedForm: input.ctx.resolvedForm || null,
+    textScale: input.ctx.textScale === undefined ? 1 : input.ctx.textScale,
+    adaptive: input.ctx.adaptive || 'auto',
+    dir: input.ctx.dir || 'ltr',
+    diagnostics: input.ctx.diagnostics || [],
     family: input.family || null,
     components: input.catalog.map(function (entry) {
       return entry.name;

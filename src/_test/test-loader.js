@@ -15,7 +15,7 @@ import { LibProvider } from '../app-core/contexts/lib-context.js';
 import { buildSystem, THEME_PLATFORM } from '../themes/build-system.js';
 import ShowcaseIndex from '../screens/showcase/ShowcaseIndex.js';
 import FamilyPage from '../screens/showcase/FamilyPage.js';
-import { getFamilies, getHref } from '../screens/showcase/catalog.js';
+import { getFamilies, getHref, getRoster, getTotals } from '../screens/showcase/catalog.js';
 import { CELL_CHROME } from '../screens/showcase/cell-chrome.js';
 import { buildReport } from '../screens/walk/report.js';
 import Walker from '../screens/walk/Walker.js';
@@ -108,7 +108,7 @@ describe('build-system: every profile and scheme', function () {
   test('the rounded brand layer reaches the tokens without rebuilding the template', function () {
     const template = Lib.Themes.profiles.carbon.schemes.white;
     const plain = Lib.Themer.buildTheme(template, [], THEME_PLATFORM);
-    const branded = Lib.Themer.buildTheme(template, [Lib.Themes.brands.rounded], THEME_PLATFORM);
+    const branded = Lib.Themer.buildTheme(template, [Lib.Themes.profiles.carbon.brands.rounded.light], THEME_PLATFORM);
     assert.equal(branded.tokens['shape.radius_00'], 8);
     assert.equal(branded.tokens['feedback.field'], 'outline');
     assert.notEqual(plain.tokens['shape.radius_00'], 8);
@@ -189,8 +189,10 @@ describe('showcase', function () {
       const lines = texts(renderer.toJSON());
       const scheme = Object.keys(Lib.Themes.profiles[profileName].schemes)[0];
       assert.ok(lines.includes(profileName + ' / ' + scheme), lines.join(' | '));
-      for (const group of getFamilies(Lib.Components.catalog)) {
-        assert.ok(lines.includes(group.family + ' (' + group.components.length + ')'), group.family);
+      const totals = getTotals(getRoster(Lib.Components.catalog));
+      assert.ok(lines.includes(totals.built + ' of ' + totals.total + ' components built'), lines.join(' | '));
+      for (const group of getRoster(Lib.Components.catalog)) {
+        assert.ok(lines.includes(group.family + ' ' + group.built + '/' + group.total), group.family);
       }
       await act(async function () {
         renderer.unmount();
@@ -289,8 +291,8 @@ describe('acme brand', function () {
     test(profileName + ' + acme: color, family, radii and three glyphs reach the built theme', function () {
       const profile = Lib.Themes.profiles[profileName];
       const template = profile.schemes[Object.keys(profile.schemes)[0]];
-      const acme = Lib.Themes.brands.acme.tokens;
-      const built = Lib.Themer.buildTheme(template, [Lib.Themes.brands.acme], THEME_PLATFORM);
+      const acme = Lib.Themes.brands.acme.light.tokens;
+      const built = Lib.Themer.buildTheme(template, [Lib.Themes.brands.acme.light], THEME_PLATFORM);
       for (const name of ['color.interactive', 'color.focus', 'font.family.sans', 'shape.radius_04', 'shape.radius_08']) {
         assert.equal(built.tokens[name], acme[name], name);
       }
@@ -550,6 +552,7 @@ describe('walk-assert', function () {
       platform: platform,
       theme: 'default',
       scheme: 'light',
+      resolvedForm: 'expanded',
       errors: [],
       expectedCells: 1,
       gridWidth: 370,
@@ -617,6 +620,20 @@ describe('walk-assert', function () {
     assert.doesNotMatch(result.out, /Button\/default \d/);
   });
 
+  test('a web baseline walked at another form class fails the run before any cell is read', function () {
+    const compact = fixture('web', { width: 100, height: 20 });
+    compact.resolvedForm = 'compact';
+    const result = run(fixture('ios', { width: 100, height: 20 }), compact);
+    assert.equal(result.status, 1);
+    assert.match(result.out, /web resolvedForm compact != native expanded: not the same class/);
+    assert.doesNotMatch(result.out, /Button\/default \d/);
+    const unclassed = fixture('web', { width: 100, height: 20 });
+    delete unclassed.resolvedForm;
+    const missing = run(fixture('ios', { width: 100, height: 20 }), unclassed);
+    assert.equal(missing.status, 1);
+    assert.match(missing.out, /web resolvedForm/);
+  });
+
   test('a cell that shrank with its host matches a web cell that shrank the same way', function () {
     // An AspectRatio-like cell: the web reference at the native room already
     // holds the shrunk box, so like compares to like
@@ -641,7 +658,7 @@ describe('walk-assert', function () {
 describe('walker report', function () {
 
   test('carries every field the native gate reads, with fonts named and drawn', function () {
-    const built = Lib.Themer.buildTheme(Lib.Themes.profiles.material.schemes.light, [Lib.Themes.brands.acme], THEME_PLATFORM);
+    const built = Lib.Themer.buildTheme(Lib.Themes.profiles.material.schemes.light, [Lib.Themes.brands.acme.light], THEME_PLATFORM);
     const result = buildSystem(Lib, built, null, 'md');
     const ctx = { built: built, theme: result.tokens, profileName: 'material', schemeName: 'light', brandName: 'acme' };
     const report = buildReport({
@@ -651,13 +668,13 @@ describe('walker report', function () {
       cells: [{ component: 'Icon', state: 'default', width: 20, height: 20 }],
       errors: []
     });
-    assert.deepEqual(Object.keys(report).sort(), ['brand', 'cellChrome', 'cells', 'components', 'errors', 'expectedCells', 'family', 'fonts', 'gridWidth', 'platform', 'schema', 'scheme', 'theme', 'tokens']);
+    assert.deepEqual(Object.keys(report).sort(), ['adaptive', 'brand', 'cellChrome', 'cells', 'components', 'diagnostics', 'dir', 'errors', 'expectedCells', 'family', 'fonts', 'form', 'gridWidth', 'platform', 'resolvedForm', 'schema', 'scheme', 'textScale', 'theme', 'tokens']);
     assert.equal(report.expectedCells, Lib.Components.catalog.reduce(function (sum, entry) {
       return sum + entry.sample.filter(function (state) {
         return state.cell !== false;
       }).length;
     }, 0));
-    assert.equal(report.tokens['color.interactive'], Lib.Themes.brands.acme.tokens['color.interactive']);
+    assert.equal(report.tokens['color.interactive'], Lib.Themes.brands.acme.light.tokens['color.interactive']);
     const sans = report.fonts.find(function (font) {
       return font.role === 'font.family.sans';
     });

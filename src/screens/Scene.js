@@ -5,6 +5,7 @@
 // with it instead of stacking over the next native screen. The app's
 // global RootHost remains as the fallback for content outside a Scene.
 import { useLib } from '../app-core/contexts/lib-context.js';
+import ExplorerBar from './showcase/ExplorerBar.js';
 
 
 /********************************************************************
@@ -25,10 +26,13 @@ export default function Scene (props) {
   const { View } = Lib.ReactNative;
   const ctx = Lib.ThemeContext.useThemeController();
 
-  // Render the themed page with the route's local layer host confined inside
+  // Render the themed page with the explorer's control strip at the top and
+  // the route's local layer host confined inside
   return React.createElement(View, {
     testID: props.testID === undefined ? 'scene' : props.testID,
     style: { flex: 1, position: 'relative', backgroundColor: ctx.theme['color.background'] }
-  }, React.createElement(ctx.Registry.OverlayHost, { testID: 'scene-layers' }, props.children));
+  },
+  React.createElement(ExplorerBar),
+  React.createElement(ctx.Registry.OverlayHost, { testID: 'scene-layers' }, props.children));
 
 }

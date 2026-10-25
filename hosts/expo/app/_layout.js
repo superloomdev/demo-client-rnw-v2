@@ -82,8 +82,9 @@ function Boot () {
   // the Stack itself stays transparent and the themed Scene draws the page
   const { ThemeProvider } = Lib.ThemeContext;
   return (
-    <ThemeProvider profile={params.profile || params.theme} scheme={params.scheme} brand={params.brand}>
+    <ThemeProvider profile={params.profile || params.theme || params.template} scheme={params.scheme} brand={params.brand} form={params.form} adaptive={params.adaptive} textScale={params.textScale} dir={params.dir}>
       <NativeFrame>
+        {Lib.Navigation.NavigationHooks ? <Lib.Navigation.NavigationHooks /> : null}
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: 'transparent' } }} />
       </NativeFrame>
     </ThemeProvider>

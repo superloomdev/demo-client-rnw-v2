@@ -32,6 +32,11 @@ on:
         description: Library branch, tag or SHA to walk (empty walks library.ref)
         required: false
         default: ''
+      tablets:
+        description: Also walk an iPad (portrait and landscape) and an Android tablet
+        type: boolean
+        required: false
+        default: false
   push:
     tags: ['milestone-*']
 
@@ -269,5 +274,250 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: android-walk
+          path: codebase-demo-client-rnw-v2/walk-out/
+          retention-days: 14
+
+  # Tablet walks (workflow_dispatch only): the iPad job walks portrait and
+  # landscape - the two widths land in different form classes (820 CSS
+  # points is `medium`, 1194 is `expanded`) - and the Android job walks a
+  # Pixel Tablet AVD. Each web reference walk runs at that tablet's own
+  # room, the same trick the phone jobs use, because a cell capped by its
+  # host re-lays out with the room and only like-with-like compares.
+  # The landscape iPad walk rotates the booted simulator through the
+  # Simulator app's own Rotate Left shortcut (no public simctl verb exists
+  # for it); a missed keystroke is caught by walk-assert's form-class and
+  # grid-width mismatches rather than by a silent green.
+
+  web-walk-tablet:
+    name: Web walker references (tablets)
+    needs: [web-walk]
+    if: inputs.tablets == true
+    runs-on: ubuntu-latest
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: codebase-demo-client-rnw-v2
+      - name: Library ref
+        id: library
+        env:
+          LIBRARY_REF_INPUT: ${{ inputs.library_ref }}
+        run: |
+          ref="$LIBRARY_REF_INPUT"
+          if [ -z "$ref" ]; then ref=$(tr -d '[:space:]' < codebase-demo-client-rnw-v2/library.ref); fi
+          if [ -z "$ref" ]; then echo "FAIL: no library ref"; exit 1; fi
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v7
+        with:
+          repository: superloomdev/rnw-components-v2
+          ref: ${{ steps.library.outputs.ref }}
+          path: codebase-rnw-components-v2
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          registry-url: 'https://npm.pkg.github.com'
+      - name: Install and build web host
+        working-directory: codebase-demo-client-rnw-v2/hosts/web
+        run: |
+          npm ci
+          npx vite build
+      - name: Install web walker
+        working-directory: codebase-demo-client-rnw-v2
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      # iPad 11" viewport is 834 points portrait (medium class) and 1194
+      # landscape (expanded); the walker's 16-a-side padding subtracts 32
+      - name: Run the web walker at the iPad portrait room
+        working-directory: codebase-demo-client-rnw-v2
+        env:
+          WALK_VIEWPORT: '834'
+        run: |
+          npx playwright test e2e/walker.spec.js
+          mkdir -p walk-out
+          mv test-results/walk walk-out/ipad-portrait
+      - name: Run the web walker at the iPad landscape room
+        working-directory: codebase-demo-client-rnw-v2
+        env:
+          WALK_VIEWPORT: '1194'
+        run: |
+          npx playwright test e2e/walker.spec.js
+          mv test-results/walk walk-out/ipad-landscape
+      # A Pixel Tablet is 800dp wide in portrait; the medium class applies
+      - name: Run the web walker at the Android tablet room
+        working-directory: codebase-demo-client-rnw-v2
+        env:
+          WALK_VIEWPORT: '832'
+        run: |
+          npx playwright test e2e/walker.spec.js
+          mv test-results/walk walk-out/android-tablet
+      - name: Upload web reports (tablet rooms)
+        uses: actions/upload-artifact@v7
+        with:
+          name: web-walk-tablets
+          path: codebase-demo-client-rnw-v2/walk-out/
+          retention-days: 14
+
+  ios-tablet:
+    name: iPad simulator
+    needs: [web-walk-tablet]
+    if: inputs.tablets == true
+    runs-on: macos-latest
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: codebase-demo-client-rnw-v2
+      - name: Library ref
+        id: library
+        env:
+          LIBRARY_REF_INPUT: ${{ inputs.library_ref }}
+        run: |
+          ref="$LIBRARY_REF_INPUT"
+          if [ -z "$ref" ]; then ref=$(tr -d '[:space:]' < codebase-demo-client-rnw-v2/library.ref); fi
+          if [ -z "$ref" ]; then echo "FAIL: no library ref"; exit 1; fi
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v7
+        with:
+          repository: superloomdev/rnw-components-v2
+          ref: ${{ steps.library.outputs.ref }}
+          path: codebase-rnw-components-v2
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          registry-url: 'https://npm.pkg.github.com'
+      - name: Download web reports (tablet rooms)
+        uses: actions/download-artifact@v8
+        with:
+          name: web-walk-tablets
+          path: web-walk-tablets
+      - name: Install native assertion tools
+        working-directory: codebase-demo-client-rnw-v2
+        run: npm ci
+      - name: Cache Pods
+        uses: actions/cache@v4
+        with:
+          key: pods-${{ hashFiles('codebase-demo-client-rnw-v2/hosts/expo/ios/Podfile.lock') }}
+          path: codebase-demo-client-rnw-v2/hosts/expo/ios/Pods
+      - name: Install, prebuild and build Release on the iPad
+        working-directory: codebase-demo-client-rnw-v2/hosts/expo
+        env:
+          EXPO_PUBLIC_WALK_SERVER: 'http://localhost:8787'
+        run: |
+          npm ci
+          npx expo prebuild --platform ios --no-install
+          (cd ios && pod install)
+          DEVICE=$(xcrun simctl list devices available -j | node ../../scripts/pick-simulator.js ipad)
+          echo "simulator: $DEVICE"
+          npx expo run:ios --configuration Release --device "$DEVICE" --no-bundler
+      - name: Walk every template (portrait)
+        working-directory: codebase-demo-client-rnw-v2
+        run: |
+          mkdir -p walk-out/ipad-portrait
+          node scripts/walk-server.js --port 8787 --out walk-out/ipad-portrait > walk-out/ipad-portrait/walk-server.log 2>&1 &
+          sleep 3
+          node scripts/native-walk.js --platform ios --out walk-out/ipad-portrait --mode command
+      - name: Rotate and walk every template (landscape)
+        working-directory: codebase-demo-client-rnw-v2
+        run: |
+          open -a Simulator
+          sleep 2
+          osascript -e 'tell application "System Events" to keystroke "l" using command down' || true
+          sleep 3
+          mkdir -p walk-out/ipad-landscape
+          node scripts/walk-server.js --port 8788 --out walk-out/ipad-landscape > walk-out/ipad-landscape/walk-server.log 2>&1 &
+          sleep 3
+          node scripts/native-walk.js --platform ios --out walk-out/ipad-landscape --mode command --port 8788
+      - name: Assert the reports
+        working-directory: codebase-demo-client-rnw-v2
+        run: |
+          node scripts/walk-assert.js --platform ios --dir walk-out/ipad-portrait --web ../web-walk-tablets/ipad-portrait
+          node scripts/walk-assert.js --platform ios --dir walk-out/ipad-landscape --web ../web-walk-tablets/ipad-landscape
+      - name: Upload iPad evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ipad-walk
+          path: codebase-demo-client-rnw-v2/walk-out/
+          retention-days: 14
+
+  android-tablet:
+    name: Android tablet emulator
+    needs: [web-walk-tablet]
+    if: inputs.tablets == true
+    runs-on: ubuntu-latest
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GRADLE_OPTS: -Xmx4g
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: codebase-demo-client-rnw-v2
+      - name: Library ref
+        id: library
+        env:
+          LIBRARY_REF_INPUT: ${{ inputs.library_ref }}
+        run: |
+          ref="$LIBRARY_REF_INPUT"
+          if [ -z "$ref" ]; then ref=$(tr -d '[:space:]' < codebase-demo-client-rnw-v2/library.ref); fi
+          if [ -z "$ref" ]; then echo "FAIL: no library ref"; exit 1; fi
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v7
+        with:
+          repository: superloomdev/rnw-components-v2
+          ref: ${{ steps.library.outputs.ref }}
+          path: codebase-rnw-components-v2
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          registry-url: 'https://npm.pkg.github.com'
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Download web reports (Android tablet room)
+        uses: actions/download-artifact@v8
+        with:
+          name: web-walk-tablets
+          path: web-walk-tablets
+      - name: Install native assertion tools
+        working-directory: codebase-demo-client-rnw-v2
+        run: npm ci
+      - name: Install, prebuild and assemble Release
+        working-directory: codebase-demo-client-rnw-v2/hosts/expo
+        run: |
+          npm ci
+          npx expo prebuild --platform android --no-install
+          (cd android && ./gradlew assembleRelease)
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Walk every template on the tablet
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          profile: pixel_tablet
+          disable-animations: true
+          working-directory: codebase-demo-client-rnw-v2
+          script: |
+            adb install hosts/expo/android/app/build/outputs/apk/release/app-release.apk
+            mkdir -p walk-out
+            node scripts/walk-server.js --port 8787 --out walk-out > walk-out/walk-server.log 2>&1 &
+            sleep 3
+            node scripts/native-walk.js --platform android --out walk-out --report-host 10.0.2.2
+      - name: Assert the reports
+        working-directory: codebase-demo-client-rnw-v2
+        run: node scripts/walk-assert.js --platform android --dir walk-out --web ../web-walk-tablets/android-tablet
+      - name: Upload Android tablet evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-tablet-walk
           path: codebase-demo-client-rnw-v2/walk-out/
           retention-days: 14

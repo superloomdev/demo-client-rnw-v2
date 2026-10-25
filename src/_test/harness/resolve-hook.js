@@ -10,6 +10,7 @@
 //    build and the Expo export; this tier checks composition, not drawing.
 
 import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -52,5 +53,32 @@ export function resolve (specifier, context, nextResolve) {
   }
 
   return nextResolve(specifier, context);
+
+}
+
+
+/********************************************************************
+Node's ESM wants a `with { type: 'json' }` clause a static import cannot
+write (the shared parser predates import attributes); the bundlers read
+.json natively. The hook answers it here: a .json specifier loads as a
+JSON module.
+
+@param {String} url     - Resolved module URL
+@param {Object} context - Load context
+@param {Function} nextLoad - The default loader
+
+@return {Object} - { format, source } or the default result
+*********************************************************************/
+export function load (url, context, nextLoad) {
+
+  if (url.endsWith('.json')) {
+    return {
+      shortCircuit: true,
+      format: 'json',
+      source: readFileSync(fileURLToPath(url), 'utf8')
+    };
+  }
+
+  return nextLoad(url, context);
 
 }

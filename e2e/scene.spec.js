@@ -24,7 +24,7 @@ for (const entry of WALK_CASES) {
 
     const indexErrors = await openPage(page, '/?theme=' + entry.theme + '&scheme=' + entry.scheme);
     await expect(page.getByTestId('showcase-selection')).toHaveCSS('color', rgb(tokens['color.text_primary']));
-    await expect(page.getByTestId('showcase-count')).toHaveCSS('color', rgb(tokens['color.text_primary']));
+    await expect(page.getByTestId('showcase-progress')).toHaveCSS('color', rgb(tokens['color.text_primary']));
     expect(indexErrors).toEqual([]);
   });
 }

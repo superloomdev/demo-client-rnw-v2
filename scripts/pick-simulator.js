@@ -27,10 +27,11 @@ process.stdin.on('end', function () {
     return version(b) - version(a);
   });
 
-  // Take the first available iPhone
+  // Take the first available device of the requested kind
+  const kind = process.argv[2] === 'ipad' ? 'iPad' : 'iPhone';
   for (const runtime of runtimes) {
     const phone = devices[runtime].find(function (device) {
-      return device.isAvailable !== false && /^iPhone/.test(device.name);
+      return device.isAvailable !== false && device.name.indexOf(kind) === 0;
     });
     if (phone) {
       process.stderr.write('pick-simulator: ' + phone.name + ' (' + runtime + ')\n');
@@ -39,7 +40,7 @@ process.stdin.on('end', function () {
     }
   }
 
-  process.stderr.write('pick-simulator: no available iPhone simulator\n');
+  process.stderr.write('pick-simulator: no available ' + kind + ' simulator\n');
   process.exit(1);
 
 });

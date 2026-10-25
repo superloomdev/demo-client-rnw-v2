@@ -15,6 +15,10 @@ import fontsAdapter, { DECLARED_FACES } from './adapters/fonts.js';
 
 import ShowcaseIndex from '../../src/screens/showcase/ShowcaseIndex.js';
 import FamilyPage from '../../src/screens/showcase/FamilyPage.js';
+import SystemWidgetsPage from '../../src/screens/showcase/SystemWidgetsPage.js';
+import SignIn from '../../src/screens/samples/SignIn.js';
+import Settings from '../../src/screens/samples/Settings.js';
+import Records from '../../src/screens/samples/Records.js';
 import Walker from '../../src/screens/walk/Walker.js';
 
 // Stable adapter set: LibProvider memoizes the container on this reference
@@ -27,11 +31,23 @@ function Screen () {
   const segments = window.location.pathname.split('/').filter(Boolean);
   const params = new URLSearchParams(window.location.search);
 
+  if (segments[0] === 'showcase' && segments[1] === 'system-widgets') {
+    return <SystemWidgetsPage />;
+  }
   if (segments[0] === 'showcase' && segments[1]) {
     return <FamilyPage family={decodeURIComponent(segments[1])} />;
   }
   if (segments[0] === 'walk') {
     return <Walker family={segments[1] ? decodeURIComponent(segments[1]) : undefined} report={params.get('report') || undefined} />;
+  }
+  if (segments[0] === 'samples' && segments[1] === 'sign-in') {
+    return <SignIn />;
+  }
+  if (segments[0] === 'samples' && segments[1] === 'settings') {
+    return <Settings />;
+  }
+  if (segments[0] === 'samples' && segments[1] === 'records') {
+    return <Records />;
   }
 
   return <ShowcaseIndex />;
@@ -48,9 +64,13 @@ function App () {
 
   return (
     <ThemeProvider
-      profile={params.get('profile') || params.get('theme') || undefined}
+      profile={params.get('profile') || params.get('theme') || params.get('template') || undefined}
       scheme={params.get('scheme') || undefined}
       brand={params.get('brand') || undefined}
+      form={params.get('form') || undefined}
+      adaptive={params.get('adaptive') || undefined}
+      textScale={params.get('textScale') || undefined}
+      dir={params.get('dir') || undefined}
     >
       <Screen />
     </ThemeProvider>
