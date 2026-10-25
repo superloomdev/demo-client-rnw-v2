@@ -15,9 +15,9 @@
     "@superloomdev/js-helper-debug": "^1.0.0",
     "@superloomdev/js-helper-utils": "^1.0.0",
     "@superloomdev/rnw-components": "file:../../../codebase-rnw-components-v2",
-    "react": "19.2.3",
-    "react-dom": "19.2.3",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
     "react-native": "npm:react-native-web@~0.21.0",
-    "react-test-renderer": "19.2.3"
+    "react-test-renderer": "19.3.0"
   }
 }

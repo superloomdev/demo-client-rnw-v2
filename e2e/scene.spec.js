@@ -14,10 +14,12 @@ for (const entry of WALK_CASES) {
     const tokens = await page.evaluate(() => globalThis.__walk.tokens);
     await expect(page.getByTestId('scene')).toHaveCSS('background-color', rgb(tokens['color.background']));
     await expect(page.getByTestId('walk-status')).toHaveCSS('color', rgb(tokens['color.text_primary']));
+    await expect(page.getByTestId('explorer')).toHaveCount(0);
     expect(errors).toEqual([]);
 
     const familyErrors = await openPage(page, '/showcase/Form?theme=' + entry.theme + '&scheme=' + entry.scheme);
     await waitForFamily(page, 'Form');
+    await expect(page.getByTestId('explorer')).toBeVisible();
     await expect(page.getByTestId('family-title')).toHaveCSS('color', rgb(tokens['color.text_primary']));
     await expect(page.getByTestId('component-title-Form')).toHaveCSS('color', rgb(tokens['color.text_primary']));
     expect(familyErrors).toEqual([]);

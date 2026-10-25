@@ -32,7 +32,7 @@ export default function Walker (props) {
   const key = [ctx.profileName, ctx.schemeName, ctx.brandName || '', ctx.resolvedForm || '', ctx.adaptive || '', ctx.textScale || '', ctx.dir || '', props.family || '', props.report || ''].join('|');
 
   // Render one run per selection and request, inside the route's own scene
-  return React.createElement(Scene, { key: key },
+  return React.createElement(Scene, { key: key, explorer: false },
     React.createElement(WalkerRun, { family: props.family, report: props.report }));
 
 }

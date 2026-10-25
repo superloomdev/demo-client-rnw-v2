@@ -10,24 +10,26 @@ import { openPage, waitForFamily } from './helpers/showcase.js';
 
 
 /********************************************************************
-The computed height in px of the first checkbox's painted row: the
-press-target floor as rendered (control.target_min: 48 on compact and
-medium, 24 on expanded).
+Assert the settled computed height in px of the first checkbox's painted
+row: the press-target floor as rendered (control.target_min: 48 on
+compact and medium, 24 on expanded).
 
 @param {Object} page - Playwright page
 @param {String} query - The showcase query
 @param {Object} build - The build the measurement expects
+@param {Number} expected - The settled px height
 
-@return {Promise<Number>} - px height
+@return {Promise<void>}
 *********************************************************************/
-async function checkboxHeight (page, query, build) {
+async function expectCheckboxHeight (page, query, build, expected) {
 
   await openPage(page, '/showcase/Checkbox?' + query);
   await waitForFamily(page, 'Checkbox', build);
-  return page.evaluate(function () {
+  // The press target takes the floor on the row's first layout event, after the build report
+  await expect.poll(() => page.evaluate(function () {
     const box = document.querySelector('[data-cell="true"] [role="checkbox"]');
     return Math.round(box.getBoundingClientRect().height * 100) / 100;
-  });
+  })).toBe(expected);
 
 }
 
@@ -83,8 +85,8 @@ test('the brand parameter applies the profile\'s brand layer', async function ({
 test('the form parameter resolves the window-independent class', async function ({ page }) {
   // The press-target floor is 48 on compact, 24 on expanded
   await page.setViewportSize({ width: 1280, height: 720 });
-  expect(await checkboxHeight(page, 'profile=carbon&form=compact', { form: 'compact' })).toBe(48);
-  expect(await checkboxHeight(page, 'profile=carbon&form=expanded', { form: 'expanded' })).toBe(24);
+  await expectCheckboxHeight(page, 'profile=carbon&form=compact', { form: 'compact' }, 48);
+  await expectCheckboxHeight(page, 'profile=carbon&form=expanded', { form: 'expanded' }, 24);
 });
 
 test('the adaptive parameter ignores the form variant at fixed', async function ({ page }) {
@@ -95,8 +97,8 @@ test('the adaptive parameter ignores the form variant at fixed', async function 
   await openPage(page, '/showcase/Checkbox?profile=carbon');
   await waitForFamily(page, 'Checkbox');
   await expect(page.locator('[data-testid="family-Checkbox"]')).toHaveAttribute('data-form', 'compact');
-  expect(await checkboxHeight(page, 'profile=carbon&adaptive=auto', { form: 'compact', adaptive: 'auto' })).toBe(48);
-  expect(await checkboxHeight(page, 'profile=carbon&adaptive=fixed', { form: 'compact', adaptive: 'fixed' })).toBe(24);
+  await expectCheckboxHeight(page, 'profile=carbon&adaptive=auto', { form: 'compact', adaptive: 'auto' }, 48);
+  await expectCheckboxHeight(page, 'profile=carbon&adaptive=fixed', { form: 'compact', adaptive: 'fixed' }, 24);
 });
 
 test('the textScale parameter multiplies type sets', async function ({ page }) {
