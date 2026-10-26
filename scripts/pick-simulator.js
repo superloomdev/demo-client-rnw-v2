@@ -1,7 +1,10 @@
 // Info: Reads `xcrun simctl list devices available -j` on stdin and prints
-// the UDID of the first available iPhone on the newest iOS runtime. The
-// native gate uses it instead of naming a device, because a runner image's
-// simulator set changes between image versions.
+// the UDID of the first available iPhone on the newest iOS runtime. For
+// `ipad` it prints the first available `iPad Pro 11-inch` on the newest
+// runtime that has one - the web references walk its 834/1194 room, so no
+// other iPad gives a fair walk. The native gate uses it instead of naming
+// a device, because a runner image's simulator set changes between image
+// versions.
 
 let input = '';
 process.stdin.on('data', function (chunk) {
@@ -28,7 +31,7 @@ process.stdin.on('end', function () {
   });
 
   // Take the first available device of the requested kind
-  const kind = process.argv[2] === 'ipad' ? 'iPad' : 'iPhone';
+  const kind = process.argv[2] === 'ipad' ? 'iPad Pro 11-inch' : 'iPhone';
   for (const runtime of runtimes) {
     const phone = devices[runtime].find(function (device) {
       return device.isAvailable !== false && device.name.indexOf(kind) === 0;
@@ -40,7 +43,9 @@ process.stdin.on('end', function () {
     }
   }
 
-  process.stderr.write('pick-simulator: no available ' + kind + ' simulator\n');
+  process.stderr.write(process.argv[2] === 'ipad'
+    ? 'pick-simulator: no iPad Pro 11-inch simulator (the web references walk its 834/1194 room)\n'
+    : 'pick-simulator: no available ' + kind + ' simulator\n');
   process.exit(1);
 
 });
