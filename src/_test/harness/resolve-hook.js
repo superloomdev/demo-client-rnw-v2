@@ -31,8 +31,7 @@ const REDIRECTS = [
   '@superloomdev/js-client-helper-font',
   '@superloomdev/rnw-components',
   '@superloomdev/js-client-helper-themer-template-default',
-  '@superloomdev/js-client-helper-themer-template-carbon',
-  '@superloomdev/js-client-helper-themer-template-material'
+  '@superloomdev/js-client-helper-themer-template-carbon'
 ];
 
 const SVG_STUB = pathToFileURL(path.join(__dirname, 'svg-stub.js')).href;

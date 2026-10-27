@@ -63,7 +63,7 @@ describe('loader', function () {
     for (const slot of ['React', 'ReactNative', 'Svg', 'Utils', 'Debug', 'Themer', 'ThemerReact', 'Font', 'Fonts', 'Navigation', 'Themes', 'Components', 'ThemeContext', 'Config']) {
       assert.ok(Lib[slot] !== undefined && Lib[slot] !== null, 'Lib.' + slot + ' is missing');
     }
-    assert.deepEqual(Object.keys(Lib.Themes.profiles).sort(), ['carbon', 'default', 'material']);
+    assert.deepEqual(Object.keys(Lib.Themes.profiles).sort(), ['carbon', 'default']);
     assert.equal(typeof Lib.Components.createSystem, 'function');
     assert.equal(typeof Lib.Components.factories.Icon, 'function');
     assert.equal(Lib.Icons, undefined, 'icons are theme tokens, not a host adapter');
@@ -84,7 +84,7 @@ describe('loader', function () {
 
 describe('build-system: every profile and scheme', function () {
 
-  for (const profileName of ['default', 'carbon', 'material']) {
+  for (const profileName of ['default', 'carbon']) {
     const profile = Lib.Themes.profiles[profileName];
     for (const schemeName of Object.keys(profile.schemes)) {
       test(profileName + ' / ' + schemeName + ' builds a registry with every library component', function () {
@@ -183,7 +183,7 @@ describe('showcase', function () {
     assert.equal(getHref('/walk', { profileName: 'default', schemeName: 'light', brandName: null }), '/walk?profile=default&scheme=light');
   });
 
-  for (const profileName of ['default', 'carbon', 'material']) {
+  for (const profileName of ['default', 'carbon']) {
     test(profileName + ': the index names the selection and every family', async function () {
       const renderer = await renderThemed(React.createElement(ShowcaseIndex), { profile: profileName });
       const lines = texts(renderer.toJSON());
@@ -263,7 +263,7 @@ describe('showcase', function () {
         React.createElement(App, { theme: { profile: 'default' } })));
     });
     assert.ok(texts(renderer.toJSON()).includes('default / light'));
-    for (const next of [{ profile: 'carbon', line: 'carbon / white' }, { profile: 'carbon', scheme: 'g90', line: 'carbon / g90' }, { profile: 'material', brand: 'acme', line: 'material / light + acme' }]) {
+    for (const next of [{ profile: 'carbon', line: 'carbon / white' }, { profile: 'carbon', scheme: 'g90', line: 'carbon / g90' }, { profile: 'carbon', brand: 'acme', line: 'carbon / white + acme' }]) {
       await act(async function () {
         renderer.update(React.createElement(LibProvider, { adapters: ADAPTERS },
           React.createElement(App, { theme: { profile: next.profile, scheme: next.scheme, brand: next.brand } })));
@@ -287,7 +287,7 @@ describe('showcase', function () {
 
 describe('acme brand', function () {
 
-  for (const profileName of ['default', 'carbon', 'material']) {
+  for (const profileName of ['default', 'carbon']) {
     test(profileName + ' + acme: color, family, radii and three glyphs reach the built theme', function () {
       const profile = Lib.Themes.profiles[profileName];
       const template = profile.schemes[Object.keys(profile.schemes)[0]];
@@ -359,7 +359,7 @@ describe('walker', function () {
     await act(async function () {
       renderer = TestRenderer.create(React.createElement(LibProvider, { adapters: ADAPTERS }, React.createElement(App, { profile: 'default' })));
     });
-    for (const profile of ['default', 'carbon', 'material']) {
+    for (const profile of ['default', 'carbon']) {
       if (profile !== 'default') {
         await act(async function () {
           renderer.update(React.createElement(LibProvider, { adapters: ADAPTERS }, React.createElement(App, { profile: profile })));
@@ -427,7 +427,7 @@ describe('autopilot', function () {
         return line.indexOf('autopilot: waiting') === 0;
       }));
 
-      for (const next of [{ theme: 'carbon', family: null }, { theme: 'material', family: 'Icon' }]) {
+      for (const next of [{ theme: 'carbon', family: null }, { theme: 'carbon', family: 'Icon' }]) {
         command = next;
         await act(async function () {
           await new Promise(function (done) {
@@ -658,9 +658,9 @@ describe('walk-assert', function () {
 describe('walker report', function () {
 
   test('carries every field the native gate reads, with fonts named and drawn', function () {
-    const built = Lib.Themer.buildTheme(Lib.Themes.profiles.material.schemes.light, [Lib.Themes.brands.acme.light], THEME_PLATFORM);
+    const built = Lib.Themer.buildTheme(Lib.Themes.profiles.carbon.schemes.white, [Lib.Themes.brands.acme.light], THEME_PLATFORM);
     const result = buildSystem(Lib, built, null, 'md');
-    const ctx = { built: built, theme: result.tokens, profileName: 'material', schemeName: 'light', brandName: 'acme' };
+    const ctx = { built: built, theme: result.tokens, profileName: 'carbon', schemeName: 'white', brandName: 'acme' };
     const report = buildReport({
       ctx: ctx,
       platform: 'ios',

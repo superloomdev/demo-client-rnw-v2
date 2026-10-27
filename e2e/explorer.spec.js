@@ -55,9 +55,8 @@ async function sceneBackground (page, query, build) {
 
 test('the template parameter selects the theme', async function ({ page }) {
   expect(await sceneBackground(page, 'profile=carbon')).toBe('rgb(255, 255, 255)');
-  expect(await sceneBackground(page, 'profile=material')).toBe('rgb(253, 247, 255)');
   // `theme` and `template` alias `profile`
-  expect(await sceneBackground(page, 'theme=material')).toBe('rgb(253, 247, 255)');
+  expect(await sceneBackground(page, 'theme=carbon')).toBe('rgb(255, 255, 255)');
   expect(await sceneBackground(page, 'template=carbon')).toBe('rgb(255, 255, 255)');
 });
 

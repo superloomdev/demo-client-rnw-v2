@@ -10,7 +10,7 @@ import { openPage, waitForBuild } from './helpers/showcase.js';
 
 const OUT = join(process.cwd(), 'test-results', 'showcase', 'samples');
 const SCREENS = ['sign-in', 'settings', 'records'];
-const PROFILES = ['default', 'carbon', 'material'];
+const PROFILES = ['default', 'carbon'];
 const WIDTHS = [375, 768, 1280];
 
 

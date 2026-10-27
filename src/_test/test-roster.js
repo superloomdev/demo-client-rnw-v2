@@ -117,7 +117,7 @@ describe('sample screens', function () {
   const SCREENS = { 'sign-in': SignIn, 'settings': Settings, 'records': Records };
 
   for (const name of Object.keys(SCREENS)) {
-    for (const profileName of ['default', 'carbon', 'material']) {
+    for (const profileName of ['default', 'carbon']) {
       test(name + ' mounts under ' + profileName + ' first scheme with zero errors and zero diagnostics', async function () {
         const scheme = Object.keys(Lib.Themes.profiles[profileName].schemes)[0];
         const probe = {};

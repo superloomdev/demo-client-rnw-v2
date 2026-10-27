@@ -9,11 +9,9 @@ test('native parity declares both real scheme IDs for every template', function 
     { theme: 'default', mode: 'light', scheme: 'light' },
     { theme: 'default', mode: 'dark', scheme: 'dark' },
     { theme: 'carbon', mode: 'light', scheme: 'white' },
-    { theme: 'carbon', mode: 'dark', scheme: 'g100' },
-    { theme: 'material', mode: 'light', scheme: 'light' },
-    { theme: 'material', mode: 'dark', scheme: 'dark' }
+    { theme: 'carbon', mode: 'dark', scheme: 'g100' }
   ]);
-  assert.equal(walkCases(['default', 'carbon', 'material'], ['light', 'dark']).length, 6);
+  assert.equal(walkCases(['default', 'carbon'], ['light', 'dark']).length, 4);
   assert.deepEqual(walkCases(['carbon'], ['dark']), [{ theme: 'carbon', mode: 'dark', scheme: 'g100' }]);
   assert.throws(() => walkCases(['unknown'], ['light']), TypeError);
   assert.throws(() => walkCases(['carbon'], ['g100']), TypeError);

@@ -16,7 +16,7 @@
 // cell is read.
 //
 // Usage: node scripts/walk-assert.js --platform ios|android --dir <dir>
-//          [--web <dir>] [--themes default,carbon,material]
+//          [--web <dir>] [--themes default,carbon]
 //          [--schemes light,dark]
 // Exit 1 on any failure; prints one PASS/FAIL line per check.
 
@@ -32,7 +32,7 @@ const arg = function (flag, fallback) {
 const PLATFORM = arg('--platform', '');
 const DIR = resolve(arg('--dir', 'walk-out'));
 const WEB = arg('--web', null);
-const THEMES = arg('--themes', 'default,carbon,material').split(',');
+const THEMES = arg('--themes', 'default,carbon').split(',');
 const CASES = walkCases(THEMES, arg('--schemes', 'light,dark').split(','));
 const TOLERANCE = 1;
 const WIDTH_TOLERANCE = 2;

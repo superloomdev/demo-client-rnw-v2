@@ -14,7 +14,7 @@
 //
 // Usage: node scripts/native-walk.js --platform ios|android --out <dir>
 //          [--mode link|command] [--report-host localhost|10.0.2.2]
-//          [--port 8787] [--themes default,carbon,material] [--timeout 180]
+//          [--port 8787] [--themes default,carbon] [--timeout 180]
 //          [--schemes light,dark]
 //          [--app-id com.anonymous.nimbusrnwdemo]
 
@@ -36,7 +36,7 @@ const PLATFORM = arg('--platform', '');
 const OUT = resolve(arg('--out', 'walk-out'));
 const PORT = arg('--port', '8787');
 const HOST = arg('--report-host', PLATFORM === 'android' ? '10.0.2.2' : 'localhost');
-const THEMES = arg('--themes', 'default,carbon,material').split(',');
+const THEMES = arg('--themes', 'default,carbon').split(',');
 const CASES = walkCases(THEMES, arg('--schemes', 'light,dark').split(','));
 const TIMEOUT_S = Number(arg('--timeout', '180'));
 const APP_ID = arg('--app-id', 'com.anonymous.nimbusrnwdemo');

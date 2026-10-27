@@ -14,7 +14,7 @@ import { FAMILIES, PROFILES, catalog, openPage, waitForFamily } from './helpers/
 const ACME = BRAND_LAYERS.acme.light.tokens;
 
 // The sans family each profile names on its own; the brand replaces it
-const PROFILE_SANS = { default: 'IBM Plex Sans', carbon: 'IBM Plex Sans', material: 'Roboto' };
+const PROFILE_SANS = { default: 'IBM Plex Sans', carbon: 'IBM Plex Sans' };
 
 
 /********************************************************************
@@ -322,20 +322,13 @@ for (const profile of PROFILES) {
 
 
 // The template's own sample brands reach the render the same way: carbon's
-// `superloom` moves the interactive color to the purple ramp, and
-// material's `rounded` opens fields to outlines and rounds square corners
+// `superloom` moves the interactive color to the purple ramp
 for (const reach of [
   {
     name: 'carbon + superloom',
     query: 'profile=carbon&brand=superloom',
     tokens: { 'color.interactive': '#8a3ffc', 'color.button_primary': '#8a3ffc' },
     family: 'Button'
-  },
-  {
-    name: 'material + rounded',
-    query: 'profile=material&brand=rounded',
-    tokens: { 'shape.radius_00': 8 },
-    family: 'Tag'
   }
 ]) {
 

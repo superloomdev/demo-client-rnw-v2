@@ -115,7 +115,6 @@ describe('adaptive host seam', function () {
   test('each profile carries its template\'s sample brands plus acme', function () {
     assert.deepEqual(Object.keys(Lib.Themes.profiles.default.brands).sort(), ['acme', 'rounded']);
     assert.deepEqual(Object.keys(Lib.Themes.profiles.carbon.brands).sort(), ['acme', 'rounded', 'superloom']);
-    assert.deepEqual(Object.keys(Lib.Themes.profiles.material.brands).sort(), ['acme', 'rounded']);
   });
 
   test('a brand is picked by polarity', async function () {

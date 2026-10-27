@@ -7,7 +7,7 @@ import { catalog } from '../../hosts/web/node_modules/@superloomdev/rnw-componen
 
 export { catalog };
 
-export const PROFILES = ['default', 'carbon', 'material'];
+export const PROFILES = ['default', 'carbon'];
 
 // Families in catalog order
 export const FAMILIES = catalog.reduce(function (out, entry) {

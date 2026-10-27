@@ -3,7 +3,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "test": "node --import ./harness/register.js --test test-*.js"
+    "test": "node ../../scripts/guard.js -- node --import ./harness/register.js --test test-*.js"
   },
   "dependencies": {
     "@superloomdev/js-client-helper-font": "^1.0.0",
@@ -11,7 +11,6 @@
     "@superloomdev/js-client-helper-themer-ext-react": "^1.0.0",
     "@superloomdev/js-client-helper-themer-template-carbon": "^1.0.0",
     "@superloomdev/js-client-helper-themer-template-default": "^1.0.0",
-    "@superloomdev/js-client-helper-themer-template-material": "^1.0.0",
     "@superloomdev/js-helper-debug": "^1.0.0",
     "@superloomdev/js-helper-utils": "^1.0.0",
     "@superloomdev/rnw-components": "file:../../../codebase-rnw-components-v2",

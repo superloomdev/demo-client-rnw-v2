@@ -4,9 +4,7 @@ export const WALK_CASES = Object.freeze([
   Object.freeze({ theme: 'default', mode: 'light', scheme: 'light' }),
   Object.freeze({ theme: 'default', mode: 'dark', scheme: 'dark' }),
   Object.freeze({ theme: 'carbon', mode: 'light', scheme: 'white' }),
-  Object.freeze({ theme: 'carbon', mode: 'dark', scheme: 'g100' }),
-  Object.freeze({ theme: 'material', mode: 'light', scheme: 'light' }),
-  Object.freeze({ theme: 'material', mode: 'dark', scheme: 'dark' })
+  Object.freeze({ theme: 'carbon', mode: 'dark', scheme: 'g100' })
 ]);
 
 /********************************************************************
