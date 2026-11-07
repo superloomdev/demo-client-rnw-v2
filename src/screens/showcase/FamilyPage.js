@@ -82,9 +82,6 @@ function ToDoCard (props) {
   if (row.row.carbon_twin && row.row.carbon_twin !== 'none') {
     facts.push('carbon ' + row.row.carbon_twin);
   }
-  if (row.row.material_twin && row.row.material_twin !== 'none') {
-    facts.push('material ' + row.row.material_twin);
-  }
   const milestone = MILESTONES[row.row.family];
 
   return React.createElement(R.Layer, { testID: 'todo-' + row.name },

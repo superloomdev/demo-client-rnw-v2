@@ -19,7 +19,7 @@ From `src/_test/`:
 
 From `hosts/web/`:
 
-- `npm run build` - Vite web build; `npx vite preview --port 4173` serves it. Routes: `/` showcase index, `/showcase/<Family>`, `/walk[/<Family>]?report=<url>`; query `?profile=` (or `?theme=`) `default|carbon|material`, `&scheme=<s>`, `&brand=rounded|acme`
+- `npm run build` - Vite web build; `npx vite preview --port 4173` serves it. Routes: `/` showcase index, `/showcase/<Family>`, `/walk[/<Family>]?report=<url>`; query `?profile=` (or `?theme=`) `default|carbon`, `&scheme=<s>`, `&brand=rounded|acme`
 
 From `hosts/expo/`:
 
