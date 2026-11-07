@@ -18,4 +18,8 @@ export const Svg = element('svg');
 export const G = element('g');
 export const Path = element('path');
 export const Circle = element('circle');
+export const Defs = element('defs');
+export const LinearGradient = element('linearGradient');
+export const Stop = element('stop');
+export const Rect = element('rect');
 export default Svg;

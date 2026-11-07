@@ -240,7 +240,9 @@ describe('showcase', function () {
           {},
           entry.frame.height !== undefined ? { height: entry.frame.height + 'px' } : null,
           entry.frame.stage === true ? { transform: 'translateX(0px)' } : null,
-          { width: entry.frame.width + 'px' }
+          typeof entry.frame.width === 'number' ? { width: entry.frame.width + 'px' } : null,
+          entry.frame.hang && typeof entry.frame.hang.start === 'number' ? { paddingLeft: entry.frame.hang.start + 'px' } : null,
+          entry.frame.hang && typeof entry.frame.hang.bottom === 'number' ? { paddingBottom: entry.frame.hang.bottom + 'px' } : null
         ) : null
       ), entry.name);
       await act(async function () {
