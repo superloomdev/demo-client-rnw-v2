@@ -81,30 +81,6 @@ export default function Records () {
     };
   };
 
-  // Library follow-up (plan 0160 Loop-backs): Menu does not take focus from a bare trigger yet.
-  // An opened menu takes the focus so Escape and the arrows reach it. The
-  // layer host mounts the surface passes after the trigger's set state, so
-  // the focus lands when the first menuitem exists, not at a fixed delay.
-  React.useEffect(function () {
-    if (menu === null || typeof document === 'undefined') {
-      return undefined;
-    }
-    let attempts = 0;
-    const timer = setInterval(function () {
-      attempts += 1;
-      const surface = document.querySelector('[role="menu"] [role="menuitem"]');
-      if (surface && surface.focus) {
-        surface.focus();
-        clearInterval(timer);
-      } else if (attempts > 30) {
-        clearInterval(timer);
-      }
-    }, 16);
-    return function () {
-      clearInterval(timer);
-    };
-  }, [menu]);
-
   // Render the list inside the route's own scene
   return React.createElement(Scene, { testID: 'sample-records' },
     React.createElement(Lib.ReactNative.ScrollView, { contentContainerStyle: { padding: 24, gap: 12 } },
