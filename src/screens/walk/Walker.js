@@ -77,48 +77,59 @@ function WalkerRun (props) {
   const errors = React.useRef([]);
   const [gridWidth, setGridWidth] = React.useState(0);
   const [measured, setMeasured] = React.useState(0);
+  const [revision, setRevision] = React.useState(0);
   const [status, setStatus] = React.useState('measuring');
 
-  // Send the report once every cell has measured
+  // Send the report once every cell has measured and the layout has gone
+  // quiet: a native cell can lay out more than once before it settles, so
+  // the report is the layout that stopped moving; web is one pass, so the
+  // quiet period changes nothing there
   React.useEffect(function () {
 
-    // Wait for every cell
+    // Wait for every cell, then for 500 ms with no new layout
     if (measured < expected || status !== 'measuring') {
       return;
     }
 
-    // Build the report from the measurements
-    const report = buildReport({
-      ctx: ctx,
-      platform: Lib.ReactNative.Platform.OS,
-      catalog: entries,
-      cells: Object.values(cells.current),
-      errors: errors.current,
-      family: props.family,
-      gridWidth: gridWidth
-    });
-    globalThis.__walk = report;
+    const timer = setTimeout(function () {
 
-    // Without a report URL the walk is done
-    if (!props.report) {
-      setStatus('done');
-      return;
-    }
-
-    // POST the report; text/plain avoids a CORS preflight on web
-    setStatus('sending');
-    fetch(props.report, { method: 'POST', headers: { 'content-type': 'text/plain' }, body: JSON.stringify(report) })
-      .then(function (response) {
-        // Read the body so the request completes rather than being abandoned
-        return response.text().then(function () {
-          setStatus(response.ok ? 'sent' : 'send failed: ' + response.status);
-        });
-      })
-      .catch(function (error) {
-        setStatus('send failed: ' + error.message);
+      // Build the report from the measurements
+      const report = buildReport({
+        ctx: ctx,
+        platform: Lib.ReactNative.Platform.OS,
+        catalog: entries,
+        cells: Object.values(cells.current),
+        errors: errors.current,
+        family: props.family,
+        gridWidth: gridWidth
       });
+      globalThis.__walk = report;
 
-  }, [measured, expected, status]);
+      // Without a report URL the walk is done
+      if (!props.report) {
+        setStatus('done');
+        return;
+      }
+
+      // POST the report; text/plain avoids a CORS preflight on web
+      setStatus('sending');
+      fetch(props.report, { method: 'POST', headers: { 'content-type': 'text/plain' }, body: JSON.stringify(report) })
+        .then(function (response) {
+          // Read the body so the request completes rather than being abandoned
+          return response.text().then(function () {
+            setStatus(response.ok ? 'sent' : 'send failed: ' + response.status);
+          });
+        })
+        .catch(function (error) {
+          setStatus('send failed: ' + error.message);
+        });
+
+    }, 500);
+    return function () {
+      clearTimeout(timer);
+    };
+
+  }, [measured, expected, status, revision]);
 
   // The grid's own width names the room a cell body gets: a component
   // whose width is capped by its host reports it, never the token's
@@ -149,15 +160,22 @@ function WalkerRun (props) {
             borderColor: ctx.theme['color.border_subtle_01'],
             room: gridWidth - CELL_CHROME,
             onLayout: function (event) {
-              const first = cells.current[key] === undefined;
+              const previous = cells.current[key];
+              const width = event.nativeEvent.layout.width;
+              const height = event.nativeEvent.layout.height;
               cells.current[key] = {
                 component: entry.name,
                 state: state.label,
-                width: event.nativeEvent.layout.width,
-                height: event.nativeEvent.layout.height
+                width: width,
+                height: height
               };
-              if (first) {
+              if (previous === undefined) {
                 setMeasured(function (n) {
+                  return n + 1;
+                });
+              }
+              if (previous === undefined || previous.width !== width || previous.height !== height) {
+                setRevision(function (n) {
                   return n + 1;
                 });
               }
