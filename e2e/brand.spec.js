@@ -33,7 +33,9 @@ function toRgb (hex) {
 
 // The enabled focusable parts of a showcase page, excluding parts a
 // template mounts but does not draw (a close seat a template hides)
-const FOCUSABLE = '[data-cell="true"] :is([role="button"], [role="checkbox"], [role="combobox"], input):not([aria-disabled="true"]):not([disabled]):not([aria-hidden="true"]):not([aria-hidden="true"] *):visible';
+// and buttons out of the tab order (a pointer-only seat: a combo box's
+// clear and caret, a tab's close; upstream tabIndex -1)
+const FOCUSABLE = '[data-cell="true"] :is([role="button"], [role="checkbox"], [role="combobox"], input):not([aria-disabled="true"]):not([disabled]):not([aria-hidden="true"]):not([aria-hidden="true"] *):not([role="button"][tabindex="-1"]):visible';
 // A computed color with zero alpha
 const TRANSPARENT = /^rgba\(.*, 0\)$/;
 
@@ -236,7 +238,7 @@ for (const profile of PROFILES) {
 
 for (const profile of PROFILES) {
 
-  test.describe.serial(profile + ' + acme reach', function () {
+  test.describe(profile + ' + acme reach', function () {
 
     const reached = { texts: 0, focusables: 0, corners: 0 };
     let own;

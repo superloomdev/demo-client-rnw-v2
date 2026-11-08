@@ -133,7 +133,8 @@ for (const profile of PROFILES) {
             width: Math.max(0, Math.min(part.right, cell.viewport.x + cell.viewport.width) - Math.max(part.x, cell.viewport.x)),
             height: Math.max(0, Math.min(part.bottom, cell.viewport.y + cell.viewport.height) - Math.max(part.y, cell.viewport.y))
           } : part.painted;
-          if (painted.width === 0 && painted.height === 0) {
+          // A part clipped to nothing on either axis paints nothing
+          if (painted.width === 0 || painted.height === 0) {
             continue;
           }
           const bounds = free ? cell.viewport : cell.box;
