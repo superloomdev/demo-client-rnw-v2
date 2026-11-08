@@ -32,7 +32,7 @@ const TOTAL = allRows.length;
 test('the index reports the exact build progress', async function ({ page }) {
   const errors = await openPage(page, '/');
   await expect(page.getByTestId('showcase-progress')).toContainText(BUILT + ' of ' + TOTAL);
-  expect(BUILT).toBe(73);
+  expect(BUILT).toBe(126);
   expect(TOTAL).toBe(215);
   expect(errors).toEqual([]);
 });

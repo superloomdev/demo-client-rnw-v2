@@ -236,86 +236,101 @@ for (const profile of PROFILES) {
 
 for (const profile of PROFILES) {
 
-  test(profile + ' + acme: the family, focus color and radius reach every rendered component', async function ({ page }) {
+  test.describe.serial(profile + ' + acme reach', function () {
+
     const reached = { texts: 0, focusables: 0, corners: 0 };
-    const wrong = [];
-    const own = await getOwnFocusColors(page, profile);
-    const brandedPalette = await getOwnFocusColors(page, profile, 'acme');
-    const brand = [toRgb(ACME['color.focus']), toRgb(ACME['color.interactive'])];
-    expect(own.normal.filter(function (color) {
-      return brand.includes(color);
-    }), 'the brand focus colors differ from the template\'s own').toEqual([]);
-    for (const family of FAMILIES) {
-      const errors = await openPage(page, '/showcase/' + family + '?profile=' + profile + '&brand=acme');
-      await waitForFamily(page, family);
+    let own;
+    let brandedPalette;
+    let brand;
 
-      // No drawn text is left in the profile's own sans family, and the brand's family is drawn
-      const texts = await page.evaluate(function () {
-        return Array.from(document.querySelectorAll('[data-cell="true"] [data-part="body"] [dir="auto"]')).filter(function (node) {
-          return node.textContent.trim() !== '' && window.getComputedStyle(node).opacity !== '0';
-        }).map(function (node) {
-          return window.getComputedStyle(node).fontFamily.split(',')[0].replace(/["']/g, '').trim();
-        });
-      });
-      reached.texts += texts.filter(function (familyName) {
-        return familyName === ACME['font.family.sans'];
-      }).length;
-      wrong.push.apply(wrong, texts.filter(function (familyName) {
-        return familyName === PROFILE_SANS[profile] && familyName !== ACME['font.family.sans'];
-      }).map(function (familyName) {
-        return family + ': text still drawn in ' + familyName;
-      }));
-
-      // A corner that names an overridden radius takes the brand's value
-      const corners = await page.evaluate(function (radius) {
-        return Array.from(document.querySelectorAll('[data-cell="true"][data-state="rounded"] [data-part="body"] > div')).map(function (node) {
-          return window.getComputedStyle(node).borderTopLeftRadius;
-        }).filter(function (value) {
-          return value !== '0px';
-        }).map(function (value) {
-          return value === radius + 'px';
-        });
-      }, ACME['shape.radius_08']);
-      reached.corners += corners.length;
-      if (corners.some(function (ok) {
-        return !ok;
-      })) {
-        wrong.push(family + ': rounded corner not at the brand radius');
-      }
-      expect(errors).toEqual([]);
-
-      // Every enabled focusable part shows its focus, and where the template draws focus in its
-      // own focus or interactive color, the brand's color is drawn instead. Each template draws
-      // focus its own way (an outline ring, a border with an inset ring and a page-color line,
-      // a thicker field outline, a state color on the box), so the same parts are focused without
-      // the brand first: a color the template's focus draws there that is its own focus or
-      // interactive color must become the brand's. Focus never draws the browser's own ring
-      const unbranded = await getFocusDrawn(page, '/showcase/' + family + '?profile=' + profile, family);
-      const branded = await getFocusDrawn(page, '/showcase/' + family + '?profile=' + profile + '&brand=acme', family);
-      expect(branded.map(function (entry) {
-        return entry.state;
-      }), family + ': the same focusable parts with and without the brand').toEqual(unbranded.map(function (entry) {
-        return entry.state;
-      }));
-      branded.forEach(function (entry, index) {
-        const label = family + ' / ' + entry.component + ' / ' + entry.state + ': ';
-        reached.focusables += entry.colors.some(function (color) {
-          return brand.includes(color);
-        }) ? 1 : 0;
-        wrong.push.apply(wrong, focusBrandIssues(unbranded[index], entry, own, brandedPalette).map(issue => label + issue));
-      });
-    }
-    expect(wrong).toEqual([]);
-
-    // Once the catalog carries text and focusable components, each reach must have been exercised
-    const hasMore = catalog.some(function (entry) {
-      return entry.family !== 'Icon';
+    test.beforeAll(async function ({ browser }) {
+      const page = await browser.newPage();
+      own = await getOwnFocusColors(page, profile);
+      brandedPalette = await getOwnFocusColors(page, profile, 'acme');
+      brand = [toRgb(ACME['color.focus']), toRgb(ACME['color.interactive'])];
+      await page.close();
+      expect(own.normal.filter(function (color) {
+        return brand.includes(color);
+      }), 'the brand focus colors differ from the template\'s own').toEqual([]);
     });
-    if (hasMore) {
-      expect(reached.texts).toBeGreaterThan(0);
-      expect(reached.focusables).toBeGreaterThan(0);
+
+    for (const family of FAMILIES) {
+      test(profile + ' + acme / ' + family + ': the family, focus color and radius reach the component', async function ({ page }) {
+        const wrong = [];
+        const errors = await openPage(page, '/showcase/' + family + '?profile=' + profile + '&brand=acme');
+        await waitForFamily(page, family);
+
+        // No drawn text is left in the profile's own sans family, and the brand's family is drawn
+        const texts = await page.evaluate(function () {
+          return Array.from(document.querySelectorAll('[data-cell="true"] [data-part="body"] [dir="auto"]')).filter(function (node) {
+            return node.textContent.trim() !== '' && window.getComputedStyle(node).opacity !== '0';
+          }).map(function (node) {
+            return window.getComputedStyle(node).fontFamily.split(',')[0].replace(/["']/g, '').trim();
+          });
+        });
+        reached.texts += texts.filter(function (familyName) {
+          return familyName === ACME['font.family.sans'];
+        }).length;
+        wrong.push.apply(wrong, texts.filter(function (familyName) {
+          return familyName === PROFILE_SANS[profile] && familyName !== ACME['font.family.sans'];
+        }).map(function (familyName) {
+          return family + ': text still drawn in ' + familyName;
+        }));
+
+        // A corner that names an overridden radius takes the brand's value
+        const corners = await page.evaluate(function (radius) {
+          return Array.from(document.querySelectorAll('[data-cell="true"][data-state="rounded"] [data-part="body"] > div')).map(function (node) {
+            return window.getComputedStyle(node).borderTopLeftRadius;
+          }).filter(function (value) {
+            return value !== '0px';
+          }).map(function (value) {
+            return value === radius + 'px';
+          });
+        }, ACME['shape.radius_08']);
+        reached.corners += corners.length;
+        if (corners.some(function (ok) {
+          return !ok;
+        })) {
+          wrong.push(family + ': rounded corner not at the brand radius');
+        }
+        expect(errors).toEqual([]);
+
+        // Every enabled focusable part shows its focus, and where the template draws focus in its
+        // own focus or interactive color, the brand's color is drawn instead. Each template draws
+        // focus its own way (an outline ring, a border with an inset ring and a page-color line,
+        // a thicker field outline, a state color on the box), so the same parts are focused without
+        // the brand first: a color the template's focus draws there that is its own focus or
+        // interactive color must become the brand's. Focus never draws the browser's own ring
+        const unbranded = await getFocusDrawn(page, '/showcase/' + family + '?profile=' + profile, family);
+        const branded = await getFocusDrawn(page, '/showcase/' + family + '?profile=' + profile + '&brand=acme', family);
+        expect(branded.map(function (entry) {
+          return entry.state;
+        }), family + ': the same focusable parts with and without the brand').toEqual(unbranded.map(function (entry) {
+          return entry.state;
+        }));
+        branded.forEach(function (entry, index) {
+          const label = family + ' / ' + entry.component + ' / ' + entry.state + ': ';
+          reached.focusables += entry.colors.some(function (color) {
+            return brand.includes(color);
+          }) ? 1 : 0;
+          wrong.push.apply(wrong, focusBrandIssues(unbranded[index], entry, own, brandedPalette).map(issue => label + issue));
+        });
+        expect(wrong).toEqual([]);
+      });
     }
-    test.info().annotations.push({ type: 'brand', description: profile + ' + acme: ' + reached.texts + ' texts, ' + reached.focusables + ' focusables, ' + reached.corners + ' corners' });
+
+    test(profile + ' + acme: every reach was exercised', async function () {
+      // Once the catalog carries text and focusable components, each reach must have been exercised
+      const hasMore = catalog.some(function (entry) {
+        return entry.family !== 'Icon';
+      });
+      if (hasMore) {
+        expect(reached.texts).toBeGreaterThan(0);
+        expect(reached.focusables).toBeGreaterThan(0);
+      }
+      test.info().annotations.push({ type: 'brand', description: profile + ' + acme: ' + reached.texts + ' texts, ' + reached.focusables + ' focusables, ' + reached.corners + ' corners' });
+    });
+
   });
 
 }
