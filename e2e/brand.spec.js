@@ -9,7 +9,7 @@ import { expect, test } from '@playwright/test';
 
 import { BRAND_LAYERS } from '../src/themes/brand-layers.js';
 import { focusBrandIssues } from './helpers/focus-brand.js';
-import { FAMILIES, PROFILES, catalog, openPage, waitForFamily } from './helpers/showcase.js';
+import { FAMILIES, PROFILES, openPage, waitForFamily } from './helpers/showcase.js';
 
 const ACME = BRAND_LAYERS.acme.light.tokens;
 
@@ -68,8 +68,9 @@ async function getOwnFocusColors (page, profile, brand) {
 
 
 /********************************************************************
-The colors of the ring layers in a computed box-shadow: zero offset, zero
-blur and a spread (an elevation shadow is not a ring).
+The colors of the ring layers in a computed box-shadow: zero blur and a
+non-zero spread or a non-zero offset (a hard-edged line; upstream's
+accordion focus is drawn that way). An elevation shadow has blur.
 
 @param {String} shadow - Computed `box-shadow`
 
@@ -83,7 +84,7 @@ function getRingColors (shadow) {
 
   return shadow.split(/,(?![^(]*\))/).filter(function (layer) {
     const lengths = (layer.replace(/rgba?\([^)]*\)/, '').match(/-?[\d.]+px/g) || []).map(parseFloat);
-    return lengths.length >= 4 && lengths[0] === 0 && lengths[1] === 0 && lengths[2] === 0 && lengths[3] > 0;
+    return lengths.length >= 3 && lengths[2] === 0 && (lengths[3] > 0 || lengths[0] !== 0 || lengths[1] !== 0);
   }).map(function (layer) {
     return (layer.match(/rgba?\([^)]*\)/) || [''])[0];
   }).filter(function (color) {
@@ -240,7 +241,6 @@ for (const profile of PROFILES) {
 
   test.describe(profile + ' + acme reach', function () {
 
-    const reached = { texts: 0, focusables: 0, corners: 0 };
     let own;
     let brandedPalette;
     let brand;
@@ -270,9 +270,12 @@ for (const profile of PROFILES) {
             return window.getComputedStyle(node).fontFamily.split(',')[0].replace(/["']/g, '').trim();
           });
         });
-        reached.texts += texts.filter(function (familyName) {
+        const acmeTexts = texts.filter(function (familyName) {
           return familyName === ACME['font.family.sans'];
         }).length;
+        if (texts.length > 0) {
+          expect(acmeTexts, family + ': the brand family reaches drawn text').toBeGreaterThan(0);
+        }
         wrong.push.apply(wrong, texts.filter(function (familyName) {
           return familyName === PROFILE_SANS[profile] && familyName !== ACME['font.family.sans'];
         }).map(function (familyName) {
@@ -289,7 +292,7 @@ for (const profile of PROFILES) {
             return value === radius + 'px';
           });
         }, ACME['shape.radius_08']);
-        reached.corners += corners.length;
+        const cornerCount = corners.length;
         if (corners.some(function (ok) {
           return !ok;
         })) {
@@ -312,26 +315,20 @@ for (const profile of PROFILES) {
         }));
         branded.forEach(function (entry, index) {
           const label = family + ' / ' + entry.component + ' / ' + entry.state + ': ';
-          reached.focusables += entry.colors.some(function (color) {
-            return brand.includes(color);
-          }) ? 1 : 0;
           wrong.push.apply(wrong, focusBrandIssues(unbranded[index], entry, own, brandedPalette).map(issue => label + issue));
         });
+        const brandedFocus = branded.filter(function (entry) {
+          return entry.colors.some(function (color) {
+            return brand.includes(color);
+          });
+        }).length;
+        if (branded.length > 0) {
+          expect(brandedFocus, family + ': a brand focus color reaches a focusable part').toBeGreaterThan(0);
+        }
+        test.info().annotations.push({ type: 'brand', description: profile + ' + acme / ' + family + ': ' + acmeTexts + ' texts, ' + brandedFocus + ' focusables, ' + cornerCount + ' corners' });
         expect(wrong).toEqual([]);
       });
     }
-
-    test(profile + ' + acme: every reach was exercised', async function () {
-      // Once the catalog carries text and focusable components, each reach must have been exercised
-      const hasMore = catalog.some(function (entry) {
-        return entry.family !== 'Icon';
-      });
-      if (hasMore) {
-        expect(reached.texts).toBeGreaterThan(0);
-        expect(reached.focusables).toBeGreaterThan(0);
-      }
-      test.info().annotations.push({ type: 'brand', description: profile + ' + acme: ' + reached.texts + ' texts, ' + reached.focusables + ' focusables, ' + reached.corners + ' corners' });
-    });
 
   });
 
