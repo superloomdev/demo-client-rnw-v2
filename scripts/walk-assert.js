@@ -10,8 +10,9 @@
 // margin is pixel rounding only. The web and iOS round a text run once per
 // side (the web to whole points, iOS to thirds); Android lays each text run
 // out at a whole-point width, so a row of four runs is up to four points
-// wider. A cell the theme resolves to a `system` widget is the platform's
-// own control: it is reported SKIP, never compared. A face that is
+// wider. A `system` widget is seated in the theme's drawn box, so its
+// cell is compared like every other (`cell.widget` is artifact data). A
+// face that is
 // not drawn moves a label by several points, a collapsed field by a hundred.
 // The web baseline is walked at each platform's own grid width: a cell whose
 // width is capped by its host re-lays out with the room, so the reference
@@ -21,8 +22,7 @@
 // Usage: node scripts/walk-assert.js --platform ios|android --dir <dir>
 //          [--web <dir>] [--themes default,carbon]
 //          [--schemes light,dark]
-// Exit 1 on any failure; prints one PASS/FAIL line per check, SKIP for a
-// system-widget cell.
+// Exit 1 on any failure; prints one PASS/FAIL line per check.
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -138,15 +138,6 @@ for (const entry of CASES) {
     for (const cell of report.cells) {
       const key = cell.component + '/' + cell.state;
       const other = webCells[key];
-      // A cell the theme resolves to a system widget is the platform's own
-      // control: its box is the OS's, so it is reported, not compared
-      if (typeof cell.widget === 'string' && report.widgets && report.widgets[cell.widget] === 'system') {
-        const line = theme + ': ' + key + ' system widget (' + cell.widget + ' = system) ' + cell.width + 'x' + cell.height +
-          ' vs web ' + (other ? other.width + 'x' + other.height : 'missing');
-        process.stdout.write('SKIP ' + line + '\n');
-        warnings.push(line);
-        continue;
-      }
       const ok = other !== undefined && Math.abs(cell.width - other.width) <= WIDTH_TOLERANCE &&
         Math.abs(cell.height - other.height) <= TOLERANCE;
       check(ok, theme + ': ' + key + ' ' + cell.width + 'x' + cell.height + ' vs web ' + (other ? other.width + 'x' + other.height : 'missing'));
