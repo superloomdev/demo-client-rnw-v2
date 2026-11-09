@@ -12,6 +12,10 @@ import { CELL_CHROME } from '../showcase/cell-chrome.js';
 import { buildReport } from './report.js';
 
 
+// The quiet period after the last layout change before the report is sent
+export const SETTLE_MS = 500;
+
+
 /********************************************************************
 Walker screen. A new theme selection or a new walk request (a deep link
 reaching a running app) starts a fresh walk: the run is keyed by both, so
@@ -124,7 +128,7 @@ function WalkerRun (props) {
           setStatus('send failed: ' + error.message);
         });
 
-    }, 500);
+    }, SETTLE_MS);
     return function () {
       clearTimeout(timer);
     };
@@ -167,7 +171,8 @@ function WalkerRun (props) {
                 component: entry.name,
                 state: state.label,
                 width: width,
-                height: height
+                height: height,
+                widget: entry.widget === undefined ? null : entry.widget
               };
               if (previous === undefined) {
                 setMeasured(function (n) {

@@ -18,7 +18,7 @@ import FamilyPage from '../screens/showcase/FamilyPage.js';
 import { getFamilies, getHref, getRoster, getTotals } from '../screens/showcase/catalog.js';
 import { CELL_CHROME } from '../screens/showcase/cell-chrome.js';
 import { buildReport } from '../screens/walk/report.js';
-import Walker from '../screens/walk/Walker.js';
+import Walker, { SETTLE_MS } from '../screens/walk/Walker.js';
 import Autopilot from '../screens/walk/Autopilot.js';
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -343,6 +343,13 @@ describe('walker', function () {
       }
     });
 
+    // Wait out the walker's settle period so its report exists on return
+    await act(async function () {
+      await new Promise(function (done) {
+        setTimeout(done, SETTLE_MS + 50);
+      });
+    });
+
     return bodies.length;
 
   }
@@ -357,28 +364,33 @@ describe('walker', function () {
       const { ThemeProvider } = Lib.ThemeContext;
       return React.createElement(ThemeProvider, { profile: props.profile }, React.createElement(Walker));
     };
+    // Unmount in `finally`: a failed run's settle timer would otherwise fire
+    // during the next test
     let renderer;
-    await act(async function () {
-      renderer = TestRenderer.create(React.createElement(LibProvider, { adapters: ADAPTERS }, React.createElement(App, { profile: 'default' })));
-    });
-    for (const profile of ['default', 'carbon']) {
-      if (profile !== 'default') {
-        await act(async function () {
-          renderer.update(React.createElement(LibProvider, { adapters: ADAPTERS }, React.createElement(App, { profile: profile })));
-        });
+    try {
+      await act(async function () {
+        renderer = TestRenderer.create(React.createElement(LibProvider, { adapters: ADAPTERS }, React.createElement(App, { profile: 'default' })));
+      });
+      for (const profile of ['default', 'carbon']) {
+        if (profile !== 'default') {
+          await act(async function () {
+            renderer.update(React.createElement(LibProvider, { adapters: ADAPTERS }, React.createElement(App, { profile: profile })));
+          });
+        }
+        globalThis.__walk = undefined;
+        assert.equal(await layOut(renderer), expected, profile + ': cells to lay out');
+        assert.ok(globalThis.__walk, profile + ': no report was built');
+        assert.equal(globalThis.__walk.theme, profile);
+        assert.equal(globalThis.__walk.cells.length, expected);
+        assert.ok(texts(renderer.toJSON()).some(function (line) {
+          return line.indexOf('walk: done') === 0;
+        }), profile + ': status');
       }
-      globalThis.__walk = undefined;
-      assert.equal(await layOut(renderer), expected, profile + ': cells to lay out');
-      assert.ok(globalThis.__walk, profile + ': no report was built');
-      assert.equal(globalThis.__walk.theme, profile);
-      assert.equal(globalThis.__walk.cells.length, expected);
-      assert.ok(texts(renderer.toJSON()).some(function (line) {
-        return line.indexOf('walk: done') === 0;
-      }), profile + ': status');
+    } finally {
+      await act(async function () {
+        renderer.unmount();
+      });
     }
-    await act(async function () {
-      renderer.unmount();
-    });
   });
 
 });
@@ -461,8 +473,10 @@ describe('autopilot', function () {
           for (const body of bodies) {
             body.props.onLayout({ nativeEvent: { layout: { width: 20, height: 20 } } });
           }
+        });
+        await act(async function () {
           await new Promise(function (done) {
-            setTimeout(done, 20);
+            setTimeout(done, SETTLE_MS + 50);
           });
         });
         const report = reports[reports.length - 1];
@@ -670,7 +684,7 @@ describe('walker report', function () {
       cells: [{ component: 'Icon', state: 'default', width: 20, height: 20 }],
       errors: []
     });
-    assert.deepEqual(Object.keys(report).sort(), ['adaptive', 'brand', 'cellChrome', 'cells', 'components', 'diagnostics', 'dir', 'errors', 'expectedCells', 'family', 'fonts', 'form', 'gridWidth', 'platform', 'resolvedForm', 'schema', 'scheme', 'textScale', 'theme', 'tokens']);
+    assert.deepEqual(Object.keys(report).sort(), ['adaptive', 'brand', 'cellChrome', 'cells', 'components', 'diagnostics', 'dir', 'errors', 'expectedCells', 'family', 'fonts', 'form', 'gridWidth', 'platform', 'resolvedForm', 'schema', 'scheme', 'textScale', 'theme', 'tokens', 'widgets']);
     assert.equal(report.expectedCells, Lib.Components.catalog.reduce(function (sum, entry) {
       return sum + entry.sample.filter(function (state) {
         return state.cell !== false;
