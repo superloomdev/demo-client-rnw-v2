@@ -18,7 +18,7 @@ import FamilyPage from '../screens/showcase/FamilyPage.js';
 import { getFamilies, getHref, getRoster, getTotals } from '../screens/showcase/catalog.js';
 import { CELL_CHROME } from '../screens/showcase/cell-chrome.js';
 import { buildReport } from '../screens/walk/report.js';
-import Walker, { SETTLE_MS } from '../screens/walk/Walker.js';
+import Walker, { POLL_MS, SETTLE_MS } from '../screens/walk/Walker.js';
 import Autopilot from '../screens/walk/Autopilot.js';
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -343,10 +343,24 @@ describe('walker', function () {
       }
     });
 
-    // Wait out the walker's settle period so its report exists on return
+    // Wait out the walker's settle period so its report exists on return:
+    // the first wait lets the measuring poll queue `confirming` (its commit
+    // lands when the act ends); the marker's onLayout is the UI thread's
+    // receipt for that commit, which a test host fires itself; the last
+    // wait covers the confirming quiet and the send
     await act(async function () {
       await new Promise(function (done) {
-        setTimeout(done, SETTLE_MS + 50);
+        setTimeout(done, SETTLE_MS + 2 * POLL_MS + 100);
+      });
+    });
+    await act(async function () {
+      renderer.root.findByProps({ testID: 'walk-marker' }).props.onLayout({
+        nativeEvent: { layout: { width: 400, height: 2 } }
+      });
+    });
+    await act(async function () {
+      await new Promise(function (done) {
+        setTimeout(done, SETTLE_MS + 2 * POLL_MS + 100);
       });
     });
 
@@ -476,7 +490,17 @@ describe('autopilot', function () {
         });
         await act(async function () {
           await new Promise(function (done) {
-            setTimeout(done, SETTLE_MS + 50);
+            setTimeout(done, SETTLE_MS + 2 * POLL_MS + 100);
+          });
+        });
+        await act(async function () {
+          renderer.root.findByProps({ testID: 'walk-marker' }).props.onLayout({
+            nativeEvent: { layout: { width: 400, height: 2 } }
+          });
+        });
+        await act(async function () {
+          await new Promise(function (done) {
+            setTimeout(done, SETTLE_MS + 2 * POLL_MS + 100);
           });
         });
         const report = reports[reports.length - 1];
