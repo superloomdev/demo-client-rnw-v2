@@ -17,7 +17,6 @@ import * as factories from '@superloomdev/rnw-components/all';
 import { catalog } from '@superloomdev/rnw-components/catalog';
 import defaultProfile from '@superloomdev/js-client-helper-themer-template-default';
 import carbonProfile from '@superloomdev/js-client-helper-themer-template-carbon';
-import materialProfile from '@superloomdev/js-client-helper-themer-template-material';
 
 import { Validators } from './loader.validators.js';
 import static_config from './config.js';
@@ -92,8 +91,7 @@ export default function loader (adapters) {
   Lib.Themes = {
     profiles: {
       default: defaultProfile,
-      carbon: carbonProfile,
-      material: materialProfile
+      carbon: carbonProfile
     },
     brands: BRAND_LAYERS
   };

@@ -11,8 +11,8 @@
   "scripts": {
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "test:e2e": "npx playwright test",
-    "verify": "node scripts/verify.js",
+    "test:e2e": "node scripts/guard.js --seconds 3600 -- npx playwright test",
+    "verify": "node scripts/guard.js --seconds 3600 -- node scripts/verify.js",
     "verify:fast": "node scripts/verify.js --fast",
     "verify:gates": "node scripts/verify.js --gates",
     "walk-server": "node scripts/walk-server.js"

@@ -1,7 +1,7 @@
 // Info: Theme context - the runtime-theming hub for the host app. Wraps the
 // themer-ext-react extension with the app's three choices:
 //
-//   1. a profile (one template package: default, carbon, material),
+//   1. a profile (one template package: default, carbon),
 //   2. a scheme inside it (a complete token set: light, dark, g90 ...),
 //   3. optionally one sparse brand layer on top.
 //
@@ -60,7 +60,7 @@ const ThemeContext = {
   extension's transform seam.
 
   @param {Object} props         - React props
-  @param {String} props.profile - default | carbon | material (optional)
+  @param {String} props.profile - default | carbon (optional)
   @param {String} props.scheme  - scheme within the profile (optional; first)
   @param {String} props.brand   - a key of Lib.Themes.brands (optional)
   @param {Node}   props.children

@@ -280,7 +280,7 @@ jobs:
   # Tablet walks (workflow_dispatch only): the iPad job walks portrait and
   # landscape - the two widths land in different form classes (820 CSS
   # points is `medium`, 1194 is `expanded`) - and the Android job walks a
-  # Pixel Tablet AVD. Each web reference walk runs at that tablet's own
+  # Pixel Tablet AVD, which boots landscape at 1280dp, the expanded class. Each web reference walk runs at that tablet's own
   # room, the same trick the phone jobs use, because a cell capped by its
   # host re-lays out with the room and only like-with-like compares.
   # The landscape iPad walk rotates the booted simulator through the
@@ -344,11 +344,11 @@ jobs:
         run: |
           npx playwright test e2e/walker.spec.js
           mv test-results/walk walk-out/ipad-landscape
-      # A Pixel Tablet is 800dp wide in portrait; the medium class applies
+      # A Pixel Tablet boots landscape at 1280dp, the expanded class; the iPad covers medium (portrait) and expanded (landscape)
       - name: Run the web walker at the Android tablet room
         working-directory: codebase-demo-client-rnw-v2
         env:
-          WALK_VIEWPORT: '832'
+          WALK_VIEWPORT: '1280'
         run: |
           npx playwright test e2e/walker.spec.js
           mv test-results/walk walk-out/android-tablet
@@ -416,7 +416,7 @@ jobs:
         working-directory: codebase-demo-client-rnw-v2
         run: |
           mkdir -p walk-out/ipad-portrait
-          node scripts/walk-server.js --port 8787 --out walk-out/ipad-portrait > walk-out/ipad-portrait/walk-server.log 2>&1 &
+          node scripts/walk-server.js --port 8787 --out walk-out/ipad-portrait > walk-out/ipad-portrait/walk-server.log 2>&1 & echo $! > walk-out/ipad-portrait/server.pid
           sleep 3
           node scripts/native-walk.js --platform ios --out walk-out/ipad-portrait --mode command
       - name: Rotate and walk every template (landscape)
@@ -426,10 +426,11 @@ jobs:
           sleep 2
           osascript -e 'tell application "System Events" to keystroke "l" using command down' || true
           sleep 3
+          kill "$(cat walk-out/ipad-portrait/server.pid)" || true; sleep 1
           mkdir -p walk-out/ipad-landscape
-          node scripts/walk-server.js --port 8788 --out walk-out/ipad-landscape > walk-out/ipad-landscape/walk-server.log 2>&1 &
+          node scripts/walk-server.js --port 8787 --out walk-out/ipad-landscape > walk-out/ipad-landscape/walk-server.log 2>&1 &
           sleep 3
-          node scripts/native-walk.js --platform ios --out walk-out/ipad-landscape --mode command --port 8788
+          node scripts/native-walk.js --platform ios --out walk-out/ipad-landscape --mode command --port 8787
       - name: Assert the reports
         working-directory: codebase-demo-client-rnw-v2
         run: |

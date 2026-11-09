@@ -5,10 +5,14 @@
 // until the hosts carry it). With `--web <dir>`, the web report must have
 // drawn the same families (a baseline measured in a fallback face is no
 // baseline), and every cell must match the web walker's: height within one
-// point, width within two. The same tokens and the same font files produce
-// the same boxes on every platform; the width margin is pixel rounding only,
-// because each platform rounds a text run up to its own pixel grid (the web
-// and Android to whole points, iOS to thirds) once per side. A face that is
+// point, width within two on iOS and four on Android. The same tokens and
+// the same font files produce the same boxes on every platform; the width
+// margin is pixel rounding only. The web and iOS round a text run once per
+// side (the web to whole points, iOS to thirds); Android lays each text run
+// out at a whole-point width, so a row of four runs is up to four points
+// wider. A `system` widget is seated in the theme's drawn box, so its
+// cell is compared like every other (`cell.widget` is artifact data). A
+// face that is
 // not drawn moves a label by several points, a collapsed field by a hundred.
 // The web baseline is walked at each platform's own grid width: a cell whose
 // width is capped by its host re-lays out with the room, so the reference
@@ -16,7 +20,7 @@
 // cell is read.
 //
 // Usage: node scripts/walk-assert.js --platform ios|android --dir <dir>
-//          [--web <dir>] [--themes default,carbon,material]
+//          [--web <dir>] [--themes default,carbon]
 //          [--schemes light,dark]
 // Exit 1 on any failure; prints one PASS/FAIL line per check.
 
@@ -32,10 +36,10 @@ const arg = function (flag, fallback) {
 const PLATFORM = arg('--platform', '');
 const DIR = resolve(arg('--dir', 'walk-out'));
 const WEB = arg('--web', null);
-const THEMES = arg('--themes', 'default,carbon,material').split(',');
+const THEMES = arg('--themes', 'default,carbon').split(',');
 const CASES = walkCases(THEMES, arg('--schemes', 'light,dark').split(','));
 const TOLERANCE = 1;
-const WIDTH_TOLERANCE = 2;
+const WIDTH_TOLERANCE = { ios: 2, android: 4 }[PLATFORM];
 // Font roles whose family must be drawn as named; the others are reported
 const REQUIRED_FONTS = ['font.family.sans', 'font.family.mono'];
 
@@ -75,6 +79,10 @@ for (const entry of CASES) {
   check(report.platform === PLATFORM && report.theme === theme && report.scheme === scheme,
     theme + ': report is for ' + PLATFORM + ' / ' + theme + ' / ' + scheme);
   check(Array.isArray(report.errors) && report.errors.length === 0, theme + ': zero render errors ' + JSON.stringify(report.errors));
+  const missingAdapters = (report.diagnostics || []).filter(function (diagnostic) {
+    return diagnostic.code === 'adapter_missing';
+  });
+  check(missingAdapters.length === 0, theme + ': no adapter_missing diagnostic ' + JSON.stringify(missingAdapters));
   check(report.cells.length === report.expectedCells, theme + ': ' + report.cells.length + ' of ' + report.expectedCells + ' cells measured');
   const empty = report.cells.filter(function (cell) {
     return !(cell.width > 0 && cell.height > 0);

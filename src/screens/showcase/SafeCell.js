@@ -127,10 +127,11 @@ export default function createSafeCell (Lib) {
     // A component that fills its container is laid out in the frame its catalog entry names,
     // capped at the room the grid reports: a stage wider than the body would run off-screen.
     // A `stage` frame makes the body the containing block of a fixed layer, so an overlay
-    // component paints its layer inside the cell it was mounted in. Every body caps at the
-    // room too: a child's percentage max-width must resolve against the same definite room
-    // on every platform (Yoga inherits the grid's constraint into an auto-size parent; CSS
-    // ignores a percentage max-width whose containing block is indefinite)
+    // component paints its layer inside the cell it was mounted in. A `hang` reserves the
+    // room a part upstream paints outside the component's box, as a host must. Every body
+    // caps at the room too: a child's percentage max-width must resolve against the same
+    // definite room on every platform (Yoga inherits the grid's constraint into an auto-size
+    // parent; CSS ignores a percentage max-width whose containing block is indefinite)
     React.createElement(View, {
       testID: 'body-' + id,
       dataSet: { part: 'body' },
@@ -140,7 +141,9 @@ export default function createSafeCell (Lib) {
       }, props.entry.frame ? {
         height: props.entry.frame.height,
         transform: props.entry.frame.stage === true ? [{ translateX: 0 }] : undefined,
-        width: props.room > 0 ? Math.min(props.entry.frame.width, props.room) : props.entry.frame.width
+        width: Lib.Utils.isNumber(props.entry.frame.width) ? (props.room > 0 ? Math.min(props.entry.frame.width, props.room) : props.entry.frame.width) : undefined,
+        paddingStart: props.entry.frame.hang && Lib.Utils.isNumber(props.entry.frame.hang.start) ? props.entry.frame.hang.start : undefined,
+        paddingBottom: props.entry.frame.hang && Lib.Utils.isNumber(props.entry.frame.hang.bottom) ? props.entry.frame.hang.bottom : undefined
       } : {})
     }, content));
 

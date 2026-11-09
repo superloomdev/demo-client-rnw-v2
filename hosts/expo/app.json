@@ -4,9 +4,8 @@
     "slug": "nimbus-rnw-demo",
     "scheme": "nimbus",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.anonymous.nimbusrnwdemo"

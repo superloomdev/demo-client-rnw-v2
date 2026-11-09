@@ -3,7 +3,7 @@
 //   /                    showcase index
 //   /showcase/<Family>   one family, every sample state
 //   /walk[/<Family>]     the walker (?report=<url> POSTs its report)
-// The query selects the theme: ?profile=|theme=default|carbon|material,
+// The query selects the theme: ?profile=|theme=default|carbon,
 // &scheme=<s>, &brand=<b>.
 
 import React from 'react';

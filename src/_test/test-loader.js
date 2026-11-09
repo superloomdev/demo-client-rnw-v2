@@ -18,7 +18,7 @@ import FamilyPage from '../screens/showcase/FamilyPage.js';
 import { getFamilies, getHref, getRoster, getTotals } from '../screens/showcase/catalog.js';
 import { CELL_CHROME } from '../screens/showcase/cell-chrome.js';
 import { buildReport } from '../screens/walk/report.js';
-import Walker from '../screens/walk/Walker.js';
+import Walker, { POLL_MS, SETTLE_MS } from '../screens/walk/Walker.js';
 import Autopilot from '../screens/walk/Autopilot.js';
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -63,7 +63,7 @@ describe('loader', function () {
     for (const slot of ['React', 'ReactNative', 'Svg', 'Utils', 'Debug', 'Themer', 'ThemerReact', 'Font', 'Fonts', 'Navigation', 'Themes', 'Components', 'ThemeContext', 'Config']) {
       assert.ok(Lib[slot] !== undefined && Lib[slot] !== null, 'Lib.' + slot + ' is missing');
     }
-    assert.deepEqual(Object.keys(Lib.Themes.profiles).sort(), ['carbon', 'default', 'material']);
+    assert.deepEqual(Object.keys(Lib.Themes.profiles).sort(), ['carbon', 'default']);
     assert.equal(typeof Lib.Components.createSystem, 'function');
     assert.equal(typeof Lib.Components.factories.Icon, 'function');
     assert.equal(Lib.Icons, undefined, 'icons are theme tokens, not a host adapter');
@@ -84,7 +84,7 @@ describe('loader', function () {
 
 describe('build-system: every profile and scheme', function () {
 
-  for (const profileName of ['default', 'carbon', 'material']) {
+  for (const profileName of ['default', 'carbon']) {
     const profile = Lib.Themes.profiles[profileName];
     for (const schemeName of Object.keys(profile.schemes)) {
       test(profileName + ' / ' + schemeName + ' builds a registry with every library component', function () {
@@ -183,7 +183,7 @@ describe('showcase', function () {
     assert.equal(getHref('/walk', { profileName: 'default', schemeName: 'light', brandName: null }), '/walk?profile=default&scheme=light');
   });
 
-  for (const profileName of ['default', 'carbon', 'material']) {
+  for (const profileName of ['default', 'carbon']) {
     test(profileName + ': the index names the selection and every family', async function () {
       const renderer = await renderThemed(React.createElement(ShowcaseIndex), { profile: profileName });
       const lines = texts(renderer.toJSON());
@@ -240,7 +240,9 @@ describe('showcase', function () {
           {},
           entry.frame.height !== undefined ? { height: entry.frame.height + 'px' } : null,
           entry.frame.stage === true ? { transform: 'translateX(0px)' } : null,
-          { width: entry.frame.width + 'px' }
+          typeof entry.frame.width === 'number' ? { width: entry.frame.width + 'px' } : null,
+          entry.frame.hang && typeof entry.frame.hang.start === 'number' ? { paddingLeft: entry.frame.hang.start + 'px' } : null,
+          entry.frame.hang && typeof entry.frame.hang.bottom === 'number' ? { paddingBottom: entry.frame.hang.bottom + 'px' } : null
         ) : null
       ), entry.name);
       await act(async function () {
@@ -263,7 +265,7 @@ describe('showcase', function () {
         React.createElement(App, { theme: { profile: 'default' } })));
     });
     assert.ok(texts(renderer.toJSON()).includes('default / light'));
-    for (const next of [{ profile: 'carbon', line: 'carbon / white' }, { profile: 'carbon', scheme: 'g90', line: 'carbon / g90' }, { profile: 'material', brand: 'acme', line: 'material / light + acme' }]) {
+    for (const next of [{ profile: 'carbon', line: 'carbon / white' }, { profile: 'carbon', scheme: 'g90', line: 'carbon / g90' }, { profile: 'carbon', brand: 'acme', line: 'carbon / white + acme' }]) {
       await act(async function () {
         renderer.update(React.createElement(LibProvider, { adapters: ADAPTERS },
           React.createElement(App, { theme: { profile: next.profile, scheme: next.scheme, brand: next.brand } })));
@@ -287,7 +289,7 @@ describe('showcase', function () {
 
 describe('acme brand', function () {
 
-  for (const profileName of ['default', 'carbon', 'material']) {
+  for (const profileName of ['default', 'carbon']) {
     test(profileName + ' + acme: color, family, radii and three glyphs reach the built theme', function () {
       const profile = Lib.Themes.profiles[profileName];
       const template = profile.schemes[Object.keys(profile.schemes)[0]];
@@ -341,6 +343,27 @@ describe('walker', function () {
       }
     });
 
+    // Wait out the walker's settle period so its report exists on return:
+    // the first wait lets the measuring poll queue `confirming` (its commit
+    // lands when the act ends); the marker's onLayout is the UI thread's
+    // receipt for that commit, which a test host fires itself; the last
+    // wait covers the confirming quiet and the send
+    await act(async function () {
+      await new Promise(function (done) {
+        setTimeout(done, SETTLE_MS + 2 * POLL_MS + 100);
+      });
+    });
+    await act(async function () {
+      renderer.root.findByProps({ testID: 'walk-marker' }).props.onLayout({
+        nativeEvent: { layout: { width: 400, height: 2 } }
+      });
+    });
+    await act(async function () {
+      await new Promise(function (done) {
+        setTimeout(done, SETTLE_MS + 2 * POLL_MS + 100);
+      });
+    });
+
     return bodies.length;
 
   }
@@ -355,28 +378,33 @@ describe('walker', function () {
       const { ThemeProvider } = Lib.ThemeContext;
       return React.createElement(ThemeProvider, { profile: props.profile }, React.createElement(Walker));
     };
+    // Unmount in `finally`: a failed run's settle timer would otherwise fire
+    // during the next test
     let renderer;
-    await act(async function () {
-      renderer = TestRenderer.create(React.createElement(LibProvider, { adapters: ADAPTERS }, React.createElement(App, { profile: 'default' })));
-    });
-    for (const profile of ['default', 'carbon', 'material']) {
-      if (profile !== 'default') {
-        await act(async function () {
-          renderer.update(React.createElement(LibProvider, { adapters: ADAPTERS }, React.createElement(App, { profile: profile })));
-        });
+    try {
+      await act(async function () {
+        renderer = TestRenderer.create(React.createElement(LibProvider, { adapters: ADAPTERS }, React.createElement(App, { profile: 'default' })));
+      });
+      for (const profile of ['default', 'carbon']) {
+        if (profile !== 'default') {
+          await act(async function () {
+            renderer.update(React.createElement(LibProvider, { adapters: ADAPTERS }, React.createElement(App, { profile: profile })));
+          });
+        }
+        globalThis.__walk = undefined;
+        assert.equal(await layOut(renderer), expected, profile + ': cells to lay out');
+        assert.ok(globalThis.__walk, profile + ': no report was built');
+        assert.equal(globalThis.__walk.theme, profile);
+        assert.equal(globalThis.__walk.cells.length, expected);
+        assert.ok(texts(renderer.toJSON()).some(function (line) {
+          return line.indexOf('walk: done') === 0;
+        }), profile + ': status');
       }
-      globalThis.__walk = undefined;
-      assert.equal(await layOut(renderer), expected, profile + ': cells to lay out');
-      assert.ok(globalThis.__walk, profile + ': no report was built');
-      assert.equal(globalThis.__walk.theme, profile);
-      assert.equal(globalThis.__walk.cells.length, expected);
-      assert.ok(texts(renderer.toJSON()).some(function (line) {
-        return line.indexOf('walk: done') === 0;
-      }), profile + ': status');
+    } finally {
+      await act(async function () {
+        renderer.unmount();
+      });
     }
-    await act(async function () {
-      renderer.unmount();
-    });
   });
 
 });
@@ -427,7 +455,7 @@ describe('autopilot', function () {
         return line.indexOf('autopilot: waiting') === 0;
       }));
 
-      for (const next of [{ theme: 'carbon', family: null }, { theme: 'material', family: 'Icon' }]) {
+      for (const next of [{ theme: 'carbon', family: null }, { theme: 'carbon', family: 'Icon' }]) {
         command = next;
         await act(async function () {
           await new Promise(function (done) {
@@ -459,8 +487,20 @@ describe('autopilot', function () {
           for (const body of bodies) {
             body.props.onLayout({ nativeEvent: { layout: { width: 20, height: 20 } } });
           }
+        });
+        await act(async function () {
           await new Promise(function (done) {
-            setTimeout(done, 20);
+            setTimeout(done, SETTLE_MS + 2 * POLL_MS + 100);
+          });
+        });
+        await act(async function () {
+          renderer.root.findByProps({ testID: 'walk-marker' }).props.onLayout({
+            nativeEvent: { layout: { width: 400, height: 2 } }
+          });
+        });
+        await act(async function () {
+          await new Promise(function (done) {
+            setTimeout(done, SETTLE_MS + 2 * POLL_MS + 100);
           });
         });
         const report = reports[reports.length - 1];
@@ -658,9 +698,9 @@ describe('walk-assert', function () {
 describe('walker report', function () {
 
   test('carries every field the native gate reads, with fonts named and drawn', function () {
-    const built = Lib.Themer.buildTheme(Lib.Themes.profiles.material.schemes.light, [Lib.Themes.brands.acme.light], THEME_PLATFORM);
+    const built = Lib.Themer.buildTheme(Lib.Themes.profiles.carbon.schemes.white, [Lib.Themes.brands.acme.light], THEME_PLATFORM);
     const result = buildSystem(Lib, built, null, 'md');
-    const ctx = { built: built, theme: result.tokens, profileName: 'material', schemeName: 'light', brandName: 'acme' };
+    const ctx = { built: built, theme: result.tokens, profileName: 'carbon', schemeName: 'white', brandName: 'acme' };
     const report = buildReport({
       ctx: ctx,
       platform: 'ios',
@@ -668,7 +708,7 @@ describe('walker report', function () {
       cells: [{ component: 'Icon', state: 'default', width: 20, height: 20 }],
       errors: []
     });
-    assert.deepEqual(Object.keys(report).sort(), ['adaptive', 'brand', 'cellChrome', 'cells', 'components', 'diagnostics', 'dir', 'errors', 'expectedCells', 'family', 'fonts', 'form', 'gridWidth', 'platform', 'resolvedForm', 'schema', 'scheme', 'textScale', 'theme', 'tokens']);
+    assert.deepEqual(Object.keys(report).sort(), ['adaptive', 'brand', 'cellChrome', 'cells', 'components', 'diagnostics', 'dir', 'errors', 'expectedCells', 'family', 'fonts', 'form', 'gridWidth', 'platform', 'resolvedForm', 'schema', 'scheme', 'textScale', 'theme', 'tokens', 'widgets']);
     assert.equal(report.expectedCells, Lib.Components.catalog.reduce(function (sum, entry) {
       return sum + entry.sample.filter(function (state) {
         return state.cell !== false;

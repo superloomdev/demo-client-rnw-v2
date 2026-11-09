@@ -7,7 +7,7 @@ import { catalog } from '../../hosts/web/node_modules/@superloomdev/rnw-componen
 
 export { catalog };
 
-export const PROFILES = ['default', 'carbon', 'material'];
+export const PROFILES = ['default', 'carbon'];
 
 // Families in catalog order
 export const FAMILIES = catalog.reduce(function (out, entry) {
@@ -109,7 +109,8 @@ export async function waitForBuild (page, selector, build) {
 
 /********************************************************************
 Serialize the accessibility tree of every cell body: tag, role, aria-*,
-tabindex, disabled and text per element; an svg is one leaf.
+tabindex, disabled and text per element; an svg is one leaf; an aria-hidden
+subtree is not in the tree.
 
 @param {Object} page - Playwright page
 
@@ -122,6 +123,10 @@ export async function getA11yTrees (page) {
     for (const cell of document.querySelectorAll('[data-cell="true"]')) {
       const lines = [];
       const walk = function (node, depth) {
+        // A node hidden from assistive technology takes its subtree with it
+        if (node.getAttribute('aria-hidden') === 'true') {
+          return;
+        }
         const parts = [node.tagName.toLowerCase()];
         const names = Array.from(node.attributes).map(function (attribute) {
           return attribute.name;

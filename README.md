@@ -17,7 +17,7 @@ The proving ground for the generic Superloom React Native Web component library:
 
 ## Selecting a theme
 
-Both hosts read `?profile=default|carbon|material`, `&scheme=<name>` (a scheme of that profile, first by default) and `&brand=<name>` (a key of `src/themes/brand-layers.js`: `rounded`, `acme`).
+Both hosts read `?profile=default|carbon`, `&scheme=<name>` (a scheme of that profile, first by default) and `&brand=<name>` (a key of `src/themes/brand-layers.js`: `rounded`, `acme`).
 
 ## Commands
 

@@ -41,6 +41,14 @@ export function buildReport (input) {
     tokens[name] = drawn[name];
   }
 
+  // Init the host widgets the theme draws natively (`anatomy.*_widget`)
+  const widgets = {};
+  for (const key of Object.keys(drawn)) {
+    if (/^anatomy\..*_widget$/.test(key)) {
+      widgets[key] = drawn[key];
+    }
+  }
+
   // Return the report
   return {
     schema: 1,
@@ -54,6 +62,7 @@ export function buildReport (input) {
     adaptive: input.ctx.adaptive || 'auto',
     dir: input.ctx.dir || 'ltr',
     diagnostics: input.ctx.diagnostics || [],
+    widgets: widgets,
     family: input.family || null,
     components: input.catalog.map(function (entry) {
       return entry.name;

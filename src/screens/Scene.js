@@ -14,6 +14,7 @@ inside it.
 
 @param {Object} props          - React props
 @param {String} [props.testID] - Page test identifier (default 'scene')
+@param {Boolean} [props.explorer] - Draw the explorer strip (default true; walk scenes pass false)
 @param {Node}   props.children - The screen's content
 
 @return {Object} - React element
@@ -34,7 +35,7 @@ export default function Scene (props) {
     dataSet: { form: ctx.resolvedForm, adaptive: ctx.adaptive, textScale: String(ctx.textScale), dir: ctx.dir },
     style: { flex: 1, position: 'relative', backgroundColor: ctx.theme['color.background'] }
   },
-  React.createElement(ExplorerBar),
+  props.explorer !== false ? React.createElement(ExplorerBar) : null,
   React.createElement(ctx.Registry.OverlayHost, { testID: 'scene-layers' }, props.children));
 
 }

@@ -392,8 +392,8 @@ if (!GATES_ONLY) {
 
   if (!FAST) {
     phase('e2e', function () {
-      sh('npx playwright install --with-deps chromium');
-      sh('npx playwright test');
+      sh('node scripts/guard.js --seconds 3600 -- npx playwright install --with-deps chromium');
+      sh('node scripts/guard.js --seconds 3600 -- npx playwright test');
     });
   }
 

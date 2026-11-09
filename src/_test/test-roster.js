@@ -68,11 +68,11 @@ function testIds (renderer) {
 
 describe('roster', function () {
 
-  test('getRoster yields 215 rows in roster order, 73 built, the nine planned last', function () {
+  test('getRoster yields 215 rows in roster order, 126 built, the nine planned last', function () {
     const groups = getRoster(Lib.Components.catalog);
     const totals = getTotals(groups);
     assert.equal(totals.total, 215);
-    assert.equal(totals.built, 73);
+    assert.equal(totals.built, 126);
     const allRows = groups.reduce(function (out, group) {
       return out.concat(group.rows);
     }, []);
@@ -117,7 +117,7 @@ describe('sample screens', function () {
   const SCREENS = { 'sign-in': SignIn, 'settings': Settings, 'records': Records };
 
   for (const name of Object.keys(SCREENS)) {
-    for (const profileName of ['default', 'carbon', 'material']) {
+    for (const profileName of ['default', 'carbon']) {
       test(name + ' mounts under ' + profileName + ' first scheme with zero errors and zero diagnostics', async function () {
         const scheme = Object.keys(Lib.Themes.profiles[profileName].schemes)[0];
         const probe = {};
