@@ -5,15 +5,15 @@
 
 // The planned M9 rows, in this order
 export const PLANNED_ROWS = [
-  { name: 'BottomNavigationBar', family: 'Mobile', tier: 'composite', platform: { support: 'all', fallback: 'none' }, carbon_twin: 'none', material_twin: 'none', status: 'pending', description: 'Carbon Mobile bottom navigation bar, three to five destinations' },
-  { name: 'TopNavigationBar', family: 'Mobile', tier: 'composite', platform: { support: 'all', fallback: 'none' }, carbon_twin: 'none', material_twin: 'none', status: 'pending', description: 'Carbon Mobile top navigation bar with title, back and actions' },
-  { name: 'BottomToolbar', family: 'Mobile', tier: 'composite', platform: { support: 'all', fallback: 'none' }, carbon_twin: 'none', material_twin: 'none', status: 'pending', description: 'Carbon Mobile bottom toolbar of actions' },
-  { name: 'BottomToolbarPrimaryAction', family: 'Mobile', tier: 'composite', platform: { support: 'all', fallback: 'none' }, carbon_twin: 'none', material_twin: 'none', status: 'pending', description: 'Bottom toolbar with one raised primary action' },
-  { name: 'ActionSheet', family: 'Mobile', tier: 'composite', platform: { support: 'all', fallback: 'none' }, carbon_twin: 'none', material_twin: 'none', status: 'pending', description: 'Action sheet - drawn on web and Android, the OS sheet on iOS' },
-  { name: 'UiPanel', family: 'Mobile', tier: 'composite', platform: { support: 'all', fallback: 'none' }, carbon_twin: 'none', material_twin: 'none', status: 'pending', description: 'Carbon Mobile side panel' },
-  { name: 'UiPanelItem', family: 'Mobile', tier: 'composite', platform: { support: 'all', fallback: 'none' }, carbon_twin: 'none', material_twin: 'none', status: 'pending', description: 'One item of a UiPanel' },
-  { name: 'NavigationList', family: 'Mobile', tier: 'composite', platform: { support: 'all', fallback: 'none' }, carbon_twin: 'none', material_twin: 'none', status: 'pending', description: 'Carbon Mobile navigation list' },
-  { name: 'NavigationListItem', family: 'Mobile', tier: 'composite', platform: { support: 'all', fallback: 'none' }, carbon_twin: 'none', material_twin: 'none', status: 'pending', description: 'One item of a NavigationList' }
+  { name: 'BottomNavigationBar', family: 'Mobile', tier: 'composite', platform: { support: 'all', fallback: 'none' }, carbon_twin: 'none', status: 'pending', description: 'Carbon Mobile bottom navigation bar, three to five destinations' },
+  { name: 'TopNavigationBar', family: 'Mobile', tier: 'composite', platform: { support: 'all', fallback: 'none' }, carbon_twin: 'none', status: 'pending', description: 'Carbon Mobile top navigation bar with title, back and actions' },
+  { name: 'BottomToolbar', family: 'Mobile', tier: 'composite', platform: { support: 'all', fallback: 'none' }, carbon_twin: 'none', status: 'pending', description: 'Carbon Mobile bottom toolbar of actions' },
+  { name: 'BottomToolbarPrimaryAction', family: 'Mobile', tier: 'composite', platform: { support: 'all', fallback: 'none' }, carbon_twin: 'none', status: 'pending', description: 'Bottom toolbar with one raised primary action' },
+  { name: 'ActionSheet', family: 'Mobile', tier: 'composite', platform: { support: 'all', fallback: 'none' }, carbon_twin: 'none', status: 'pending', description: 'Action sheet - drawn on web and Android, the OS sheet on iOS' },
+  { name: 'UiPanel', family: 'Mobile', tier: 'composite', platform: { support: 'all', fallback: 'none' }, carbon_twin: 'none', status: 'pending', description: 'Carbon Mobile side panel' },
+  { name: 'UiPanelItem', family: 'Mobile', tier: 'composite', platform: { support: 'all', fallback: 'none' }, carbon_twin: 'none', status: 'pending', description: 'One item of a UiPanel' },
+  { name: 'NavigationList', family: 'Mobile', tier: 'composite', platform: { support: 'all', fallback: 'none' }, carbon_twin: 'none', status: 'pending', description: 'Carbon Mobile navigation list' },
+  { name: 'NavigationListItem', family: 'Mobile', tier: 'composite', platform: { support: 'all', fallback: 'none' }, carbon_twin: 'none', status: 'pending', description: 'One item of a NavigationList' }
 ];
 
 
