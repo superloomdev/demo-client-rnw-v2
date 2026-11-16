@@ -16,13 +16,14 @@ Open the document picker for the library's FileUploader family. The
 picker filters by MIME type only; an extension in `accept` is left to the
 library's own validation after the pick.
 
+@param {Object}  Utils            - Lib.Utils
 @param {Object}  options          - { accept, multiple }
 @param {Array}   options.accept   - Accepted types and extensions
 @param {Boolean} options.multiple - Whether several files may be chosen
 
 @return {Promise<Array|null>} - The chosen entries, or null when cancelled
 *********************************************************************/
-async function FilePicker (options) {
+async function pickFiles (Utils, options) {
 
   // Pass the MIME types the accept list names; none means any file
   const accept = Array.isArray(options.accept) ? options.accept : [];
@@ -33,7 +34,7 @@ async function FilePicker (options) {
   // Open the picker
   const result = await DocumentPicker.getDocumentAsync({
     multiple: options.multiple === true,
-    type: types.length === 0 ? '*/*' : types
+    type: Utils.isEmptyArray(types) ? '*/*' : types
   });
 
   // A cancelled pick chooses nothing
@@ -50,6 +51,11 @@ async function FilePicker (options) {
 
 
 export default function (Lib, config) { // eslint-disable-line no-unused-vars
+
+  // The document picker reads the library's own type checks
+  const FilePicker = function (options) {
+    return pickFiles(Lib.Utils, options);
+  };
 
   // The system widgets this platform carries
   return Platform.OS === 'ios'

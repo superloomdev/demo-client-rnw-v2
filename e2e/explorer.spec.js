@@ -70,12 +70,12 @@ test('the brand parameter applies the profile\'s brand layer', async function ({
   await openPage(page, '/walk/Icon?profile=carbon');
   await expect(page.getByTestId('walk-status')).toContainText('walk: done');
   const base = await page.evaluate(function () {
-    return globalThis.__walk.tokens['color.interactive'];
+    return globalThis.walkReport.tokens['color.interactive'];
   });
   await openPage(page, '/walk/Icon?profile=carbon&brand=acme');
   await expect(page.getByTestId('walk-status')).toContainText('walk: done');
   const branded = await page.evaluate(function () {
-    return globalThis.__walk.tokens['color.interactive'];
+    return globalThis.walkReport.tokens['color.interactive'];
   });
   expect(base).toBe('#0f62fe');
   expect(branded).toBe('#c2410c');

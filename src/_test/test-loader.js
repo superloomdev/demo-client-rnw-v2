@@ -79,6 +79,7 @@ describe('loader', function () {
     function stubPicker () {
       return Promise.resolve(null);
     }
+
     const hosted = appLoader({ Navigation: navigationAdapter, Fonts: fontsAdapter, Widgets: function () {
       return { FilePicker: stubPicker };
     } }).Lib;
@@ -405,11 +406,11 @@ describe('walker', function () {
             renderer.update(React.createElement(LibProvider, { adapters: ADAPTERS }, React.createElement(App, { profile: profile })));
           });
         }
-        globalThis.__walk = undefined;
+        globalThis.walkReport = undefined;
         assert.equal(await layOut(renderer), expected, profile + ': cells to lay out');
-        assert.ok(globalThis.__walk, profile + ': no report was built');
-        assert.equal(globalThis.__walk.theme, profile);
-        assert.equal(globalThis.__walk.cells.length, expected);
+        assert.ok(globalThis.walkReport, profile + ': no report was built');
+        assert.equal(globalThis.walkReport.theme, profile);
+        assert.equal(globalThis.walkReport.cells.length, expected);
         assert.ok(texts(renderer.toJSON()).some(function (line) {
           return line.indexOf('walk: done') === 0;
         }), profile + ': status');

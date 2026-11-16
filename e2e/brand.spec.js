@@ -54,7 +54,7 @@ async function getOwnFocusColors (page, profile, brand) {
   const errors = await openPage(page, '/walk/Icon?profile=' + profile + (brand ? '&brand=' + brand : ''));
   await expect(page.getByTestId('walk-status')).toContainText('walk: done');
   const tokens = await page.evaluate(function () {
-    return globalThis.__walk.tokens;
+    return globalThis.walkReport.tokens;
   });
   expect(errors).toEqual([]);
 
@@ -221,7 +221,7 @@ for (const profile of PROFILES) {
     const errors = await openPage(page, '/walk/Icon?profile=' + profile + '&brand=acme');
     await expect(page.getByTestId('walk-status')).toContainText('walk: done');
     const report = await page.evaluate(function () {
-      return globalThis.__walk;
+      return globalThis.walkReport;
     });
     expect(report.brand).toBe('acme');
     for (const name of ['color.interactive', 'color.focus', 'shape.radius_04', 'shape.radius_08']) {
@@ -350,7 +350,7 @@ for (const reach of [
     const errors = await openPage(page, '/walk/Icon?' + reach.query);
     await expect(page.getByTestId('walk-status')).toContainText('walk: done');
     const report = await page.evaluate(function () {
-      return globalThis.__walk;
+      return globalThis.walkReport;
     });
     expect(errors).toEqual([]);
     for (const name of Object.keys(reach.tokens)) {

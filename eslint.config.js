@@ -24,14 +24,5 @@ export default [
       '**/android/**',
       '**/ios/**'
     ]
-  },
-
-  // Vite define globals - injected at build time, not importable
-  {
-    languageOptions: {
-      globals: {
-        __BUILD_IDENTITY__: 'readonly'
-      }
-    }
   }
 ];

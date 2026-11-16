@@ -4,7 +4,7 @@
 // one JSON report to `report` (a URL) by POST. The native gate reaches it by
 // deep link (nimbus://walk?theme=<t>&report=<url>) and screenshots it per
 // family (nimbus://walk/<Family>?theme=<t>). On web the report is also left
-// on `globalThis.__walk` for the e2e tests.
+// on `globalThis.walkReport` for the e2e tests.
 import { useLib } from '../../app-core/contexts/lib-context.js';
 import Scene from '../Scene.js';
 import createSafeCell from '../showcase/SafeCell.js';
@@ -133,7 +133,7 @@ function WalkerRun (props) {
         family: props.family,
         gridWidth: gridWidth
       });
-      globalThis.__walk = report;
+      globalThis.walkReport = report;
 
       // Without a report URL the walk is done
       if (!props.report) {
