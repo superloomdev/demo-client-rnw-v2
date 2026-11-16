@@ -75,6 +75,20 @@ describe('loader', function () {
     }, /missing or invalid adapter slots: Navigation, Fonts/);
   });
 
+  test('the optional Widgets slot reaches Lib, and a malformed one throws', function () {
+    function stubPicker () {
+      return Promise.resolve(null);
+    }
+    const hosted = appLoader({ Navigation: navigationAdapter, Fonts: fontsAdapter, Widgets: function () {
+      return { FilePicker: stubPicker };
+    } }).Lib;
+    assert.equal(hosted.Widgets.FilePicker, stubPicker);
+    assert.deepEqual(appLoader({ Navigation: navigationAdapter, Fonts: fontsAdapter }).Lib.Widgets, {});
+    assert.throws(function () {
+      appLoader({ Navigation: navigationAdapter, Fonts: fontsAdapter, Widgets: {} });
+    }, /invalid optional adapter slots: Widgets/);
+  });
+
   test('the theme is built for the native projection', function () {
     assert.equal(THEME_PLATFORM, 'native');
   });

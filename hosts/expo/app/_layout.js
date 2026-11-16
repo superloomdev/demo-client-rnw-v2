@@ -9,6 +9,7 @@ import { StatusBar } from 'expo-status-bar';
 import { LibProvider, useLib } from '../../../src/app-core/contexts/lib-context.js';
 import navigationAdapter from '../adapters/navigation.js';
 import fontsAdapter from '../adapters/fonts.js';
+import widgetsAdapter from '../adapters/widgets.js';
 import Autopilot from '../../../src/screens/walk/Autopilot.js';
 
 // Build-time flag (Expo inlines EXPO_PUBLIC_* at bundle time): when the
@@ -17,7 +18,7 @@ import Autopilot from '../../../src/screens/walk/Autopilot.js';
 const WALK_SERVER = process.env.EXPO_PUBLIC_WALK_SERVER || null;
 
 // Stable adapter set: LibProvider memoizes the container on this reference
-const ADAPTERS = { Navigation: navigationAdapter, Fonts: fontsAdapter };
+const ADAPTERS = { Navigation: navigationAdapter, Fonts: fontsAdapter, Widgets: widgetsAdapter };
 
 
 // The native frame: the device's safe area and status bar themed to the
