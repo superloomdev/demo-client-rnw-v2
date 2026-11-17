@@ -1,5 +1,5 @@
 // Info: Pre-import hook for the test runner: registers the resolve hook and
-// supplies the one browser global the host needs (node-globals.js).
+// supplies the two browser globals the host needs (node-globals.js).
 //
 // Usage: node --import ./harness/register.js --test test-*.js
 
