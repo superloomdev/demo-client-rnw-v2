@@ -68,11 +68,11 @@ function testIds (renderer) {
 
 describe('roster', function () {
 
-  test('getRoster yields 215 rows in roster order, 126 built, the nine planned last', function () {
+  test('getRoster yields 215 rows in roster order, 153 built, the nine planned last', function () {
     const groups = getRoster(Lib.Components.catalog);
     const totals = getTotals(groups);
     assert.equal(totals.total, 215);
-    assert.equal(totals.built, 126);
+    assert.equal(totals.built, 153);
     const allRows = groups.reduce(function (out, group) {
       return out.concat(group.rows);
     }, []);

@@ -96,10 +96,13 @@ function getRingColors (shadow) {
 
 /********************************************************************
 The paint of every element in a focusable part's cell, read in the page.
+Each element keeps one paint id across reads, so a read after focus is
+compared element by element even when focus mounted new ones (a date
+picker's calendar opens on focus).
 
 @param {Object} node - The focusable element
 
-@return {Object} - { state, parts: [{ outlineStyle, outlineWidth, outlineColor, borderColor, borderWidth, shadow, fill }] }
+@return {Object} - { state, parts: [{ id, outlineStyle, outlineWidth, outlineColor, borderColor, borderWidth, shadow, fill }] }
 *********************************************************************/
 function getPaint (node) {
 
@@ -117,8 +120,13 @@ function getPaint (node) {
     component: cell.getAttribute('data-component'),
     surfaces: surfaces,
     parts: Array.from(cell.querySelectorAll('*')).map(function (candidate) {
+      if (candidate.dataset.paintId === undefined) {
+        globalThis.paintIdNext = (globalThis.paintIdNext || 0) + 1;
+        candidate.dataset.paintId = String(globalThis.paintIdNext);
+      }
       const style = window.getComputedStyle(candidate);
       return {
+        id: candidate.dataset.paintId,
         outlineStyle: style.outlineStyle,
         outlineWidth: style.outlineWidth,
         outlineColor: style.outlineColor,
@@ -149,11 +157,13 @@ async function getFocusDrawn (page, path, family) {
 
   const errors = await openPage(page, path);
   await waitForFamily(page, family);
-  const focusables = page.locator(FOCUSABLE);
-  const count = await focusables.count();
+  // The parts are fixed when the page opens: a locator resolved again per
+  // index would walk into content an earlier focus opened (a date
+  // picker's calendar days, whose focus upstream draws in the primary
+  // button color, `_flatpickr.scss:476-478`, not a focus role)
+  const focusables = await page.locator(FOCUSABLE).elementHandles();
   const out = [];
-  for (let i = 0; i < count; i++) {
-    const target = focusables.nth(i);
+  for (const target of focusables) {
     const before = await target.evaluate(getPaint);
     await target.focus();
     const after = await target.evaluate(getPaint);
@@ -161,12 +171,19 @@ async function getFocusDrawn (page, path, family) {
       node.blur();
     });
 
-    // Compare each element of the cell before and after focus
+    // Compare each element of the cell before and after focus; an element
+    // focus mounted (an opened calendar) is content, not the indicator
     const colors = [];
     let changed = false;
     let browserRing = false;
-    after.parts.forEach(function (now, index) {
-      const was = before.parts[index];
+    const previous = new Map(before.parts.map(function (part) {
+      return [part.id, part];
+    }));
+    after.parts.forEach(function (now) {
+      const was = previous.get(now.id);
+      if (was === undefined) {
+        return;
+      }
       const drawn = now.outlineStyle !== 'none' && parseFloat(now.outlineWidth) > 0;
       browserRing = browserRing || (drawn && now.outlineStyle === 'auto');
       if (drawn && (now.outlineStyle !== was.outlineStyle || now.outlineColor !== was.outlineColor || now.outlineWidth !== was.outlineWidth)) {
