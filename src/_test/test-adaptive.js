@@ -112,9 +112,9 @@ function buildSystem (template, variant, adapters, onDiagnostic) {
 
 describe('adaptive host seam', function () {
 
-  test('each profile carries its template\'s sample brands plus acme', function () {
-    assert.deepEqual(Object.keys(Lib.Themes.profiles.default.brands).sort(), ['acme', 'rounded']);
-    assert.deepEqual(Object.keys(Lib.Themes.profiles.carbon.brands).sort(), ['acme', 'rounded', 'superloom']);
+  test('each profile carries its template\'s sample brands plus acme and roles', function () {
+    assert.deepEqual(Object.keys(Lib.Themes.profiles.default.brands).sort(), ['acme', 'roles', 'rounded']);
+    assert.deepEqual(Object.keys(Lib.Themes.profiles.carbon.brands).sort(), ['acme', 'roles', 'rounded', 'superloom']);
   });
 
   test('a brand is picked by polarity', async function () {

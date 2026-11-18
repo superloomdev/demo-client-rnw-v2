@@ -324,6 +324,79 @@ describe('acme brand', function () {
 });
 
 
+/********************************************************************
+A color token value in the one form a computed style compares, or null
+for a value that is not a plain color.
+
+@param {*} value - A token value
+
+@return {String|null} - `r,g,b,a`, or null
+*********************************************************************/
+function getColorKey (value) {
+
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const hex = /^#([0-9a-f]{6})([0-9a-f]{2})?$/i.exec(value);
+  if (hex !== null) {
+    const alpha = hex[2] === undefined ? 1 : Math.round(parseInt(hex[2], 16) / 255 * 1000) / 1000;
+    return [0, 2, 4].map(function (start) {
+      return parseInt(hex[1].slice(start, start + 2), 16);
+    }).concat([alpha]).join(',');
+  }
+  const rgb = /^rgba?\(([^)]*)\)$/.exec(value.replace(/\s+/g, ''));
+  if (rgb !== null) {
+    const channels = rgb[1].split(',').map(Number);
+    return channels.slice(0, 3).concat([channels.length > 3 ? channels[3] : 1]).join(',');
+  }
+
+  return null;
+
+}
+
+
+describe('roles brand', function () {
+
+  // The brand test opens each profile at its first scheme; there, every
+  // color that shares the focus or interactive value must draw another
+  // under `roles`, or a part drawing it cannot be told from a focus leak
+  for (const profileName of ['default', 'carbon']) {
+    test(profileName + ' + roles: every color sharing the focus or interactive value draws its own', function () {
+      const profile = Lib.Themes.profiles[profileName];
+      const template = profile.schemes[Object.keys(profile.schemes)[0]];
+      const layer = Lib.Themes.brands.roles.light;
+      const own = Lib.Themer.buildTheme(template, [], THEME_PLATFORM).tokens;
+      const branded = Lib.Themer.buildTheme(template, [layer], THEME_PLATFORM).tokens;
+      const colors = Object.keys(own).filter(function (name) {
+        return name.indexOf('color.') === 0 && getColorKey(own[name]) !== null;
+      });
+      const shared = [getColorKey(own['color.focus']), getColorKey(own['color.interactive'])];
+      const missing = colors.filter(function (name) {
+        return shared.includes(getColorKey(own[name])) && getColorKey(branded[name]) === getColorKey(own[name]);
+      });
+      assert.deepEqual(missing, [], 'colors that still share the template focus or interactive value under roles');
+
+      // Each role color the brand adds is new to the scheme and to the
+      // brand: a coincident value would bring the ambiguity back
+      const added = Object.keys(layer.tokens).filter(function (name) {
+        return name !== 'color.focus' && name !== 'color.interactive';
+      });
+      const drawn = new Set(colors.map(function (name) {
+        return getColorKey(own[name]);
+      }));
+      assert.deepEqual(added.filter(function (name) {
+        return drawn.has(getColorKey(layer.tokens[name]));
+      }), [], 'role colors the unbranded scheme already draws');
+      const keys = added.map(function (name) {
+        return getColorKey(layer.tokens[name]);
+      }).concat([getColorKey(layer.tokens['color.focus'])]);
+      assert.equal(new Set(keys).size, keys.length, 'each role color is distinct from the others and from the focus color');
+    });
+  }
+
+});
+
+
 describe('walker', function () {
 
   /********************************************************************

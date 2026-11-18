@@ -8,10 +8,11 @@
 import { expect, test } from '@playwright/test';
 
 import { BRAND_LAYERS } from '../src/themes/brand-layers.js';
-import { focusBrandIssues } from './helpers/focus-brand.js';
+import { focusBrandIssues, focusRoleIssues } from './helpers/focus-brand.js';
 import { FAMILIES, PROFILES, openPage, waitForFamily } from './helpers/showcase.js';
 
 const ACME = BRAND_LAYERS.acme.light.tokens;
+const ROLES = BRAND_LAYERS.roles.light.tokens;
 
 // The sans family each profile names on its own; the brand replaces it
 const PROFILE_SANS = { default: 'IBM Plex Sans', carbon: 'IBM Plex Sans' };
@@ -260,12 +261,22 @@ for (const profile of PROFILES) {
 
     let own;
     let brandedPalette;
+    let rolesPalette;
     let brand;
 
     test.beforeAll(async function ({ browser }) {
       const page = await browser.newPage();
       own = await getOwnFocusColors(page, profile);
       brandedPalette = await getOwnFocusColors(page, profile, 'acme');
+      // Under `roles` every color that shares the template's focus value
+      // draws its own, so drawing one of those is a role, not a leak
+      rolesPalette = Object.assign(await getOwnFocusColors(page, profile, 'roles'), {
+        others: Object.keys(ROLES).filter(function (name) {
+          return name !== 'color.focus' && name !== 'color.interactive';
+        }).map(function (name) {
+          return toRgb(ROLES[name]);
+        })
+      });
       brand = [toRgb(ACME['color.focus']), toRgb(ACME['color.interactive'])];
       await page.close();
       expect(own.normal.filter(function (color) {
@@ -325,14 +336,22 @@ for (const profile of PROFILES) {
         // interactive color must become the brand's. Focus never draws the browser's own ring
         const unbranded = await getFocusDrawn(page, '/showcase/' + family + '?profile=' + profile, family);
         const branded = await getFocusDrawn(page, '/showcase/' + family + '?profile=' + profile + '&brand=acme', family);
+        const roled = await getFocusDrawn(page, '/showcase/' + family + '?profile=' + profile + '&brand=roles', family);
+        const states = unbranded.map(function (entry) {
+          return entry.state;
+        });
         expect(branded.map(function (entry) {
           return entry.state;
-        }), family + ': the same focusable parts with and without the brand').toEqual(unbranded.map(function (entry) {
+        }), family + ': the same focusable parts with and without the brand').toEqual(states);
+        expect(roled.map(function (entry) {
           return entry.state;
-        }));
+        }), family + ': the same focusable parts under roles').toEqual(states);
+        // A template focus color under `roles` is a leak; the role `roles`
+        // reads on a part is the one the brand must draw there
         branded.forEach(function (entry, index) {
           const label = family + ' / ' + entry.component + ' / ' + entry.state + ': ';
-          wrong.push.apply(wrong, focusBrandIssues(unbranded[index], entry, own, brandedPalette).map(issue => label + issue));
+          wrong.push.apply(wrong, focusBrandIssues(unbranded[index], roled[index], own, rolesPalette).map(issue => label + 'under roles: ' + issue));
+          wrong.push.apply(wrong, focusRoleIssues(entry, roled[index], brandedPalette, rolesPalette).map(issue => label + issue));
         });
         const brandedFocus = branded.filter(function (entry) {
           return entry.colors.some(function (color) {
