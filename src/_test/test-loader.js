@@ -66,7 +66,7 @@ describe('loader', function () {
     assert.deepEqual(Object.keys(Lib.Themes.profiles).sort(), ['carbon', 'default']);
     assert.equal(typeof Lib.Components.createSystem, 'function');
     assert.equal(typeof Lib.Components.factories.Icon, 'function');
-    assert.equal(Lib.Icons, undefined, 'icons are theme tokens, not a host adapter');
+    assert.equal(Lib.Icons === undefined, true, 'icons are theme tokens, not a host adapter');
   });
 
   test('a missing adapter slot throws, naming every gap', function () {

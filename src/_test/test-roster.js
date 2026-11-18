@@ -101,7 +101,7 @@ describe('roster', function () {
       const renderer = await renderThemed(React.createElement(FamilyPage, { family: group.family }), { profile: 'carbon' });
       const ids = testIds(renderer);
       for (const row of pending) {
-        assert.equal(row.entry, null, row.name + ': a pending row carries no catalog entry');
+        assert.equal(row.entry === null, true, row.name + ': a pending row carries no catalog entry');
         assert.ok(ids.indexOf('todo-' + row.name) !== -1, group.family + ' / ' + row.name + ': no to-do card in ' + ids.slice(0, 8).join(','));
       }
       await act(async function () {

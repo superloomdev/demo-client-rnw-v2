@@ -8,14 +8,17 @@
 // that says "pass primitives" depends on every author remembering it, so
 // the test host enforces it here, once, before any test file loads.
 //
-// Every equality assertion is wrapped. A live operand is replaced by a
-// short token, one per object, so equal tokens mean the same object:
-// identity is compared exactly as before and a failure prints a few words.
+// Every equality assertion is wrapped. By default a live operand is
+// refused: the assertion throws a TypeError that names its call site,
+// passing or not, so every test asserts a primitive (`node === null`, a
+// property, a count). In label mode a live operand is replaced by a short
+// token, one per object, so equal tokens mean the same object: identity is
+// compared exactly as before and a failure prints a few words.
 //
-// Modes (ASSERT_LIVE):
-//   label   (default) compare by token, never format the object
-//   refuse  throw on any live operand, passing or not: the test must
-//           assert a primitive (`node === null`, a property, a count)
+// Modes (ASSERT_LIVE, read at each call):
+//   refuse  (default) throw on any live operand, passing or not
+//   label   compare by token, never format the object; for the guard's
+//           own test and for a census run
 // ASSERT_LIVE_CENSUS=<file> appends one line per call that passed a live
 // operand (`file:line method`), in either mode.
 //
@@ -30,7 +33,6 @@ const DEEP = ['deepEqual', 'notDeepEqual', 'deepStrictEqual', 'notDeepStrictEqua
 const LABEL_ATTRIBUTES = ['id', 'role', 'data-part', 'data-testid', 'aria-label'];
 const LABEL_MAX = 120;
 const DEEP_LEVELS = 4;
-const MODE = process.env.ASSERT_LIVE === 'refuse' ? 'refuse' : 'label';
 const CENSUS = process.env.ASSERT_LIVE_CENSUS || '';
 
 const tokens = new WeakMap();
@@ -204,6 +206,19 @@ function getCallSite () {
 
 
 /********************************************************************
+The mode of the guard, read at each call so its own test can switch it.
+
+@return {String} - 'label' when ASSERT_LIVE is 'label', else 'refuse'
+*********************************************************************/
+function getMode () {
+
+  // Refusal unless label mode is asked for
+  return process.env.ASSERT_LIVE === 'label' ? 'label' : 'refuse';
+
+}
+
+
+/********************************************************************
 Wrap one assertion method of one assert object.
 
 @param {Object} target - assert or assert.strict
@@ -234,7 +249,7 @@ function wrap (target, name, levels) {
     if (CENSUS !== '') {
       appendFileSync(CENSUS, getCallSite() + ' ' + name + '\n');
     }
-    if (MODE === 'refuse') {
+    if (getMode() === 'refuse') {
       throw new TypeError('assert.' + name + ' received a live object (' + getCallSite() + '): assert a primitive - `node === null`, a property or a count - so a failure prints a value, not a graph');
     }
     return original.call(target, safeActual, safeExpected, message);
