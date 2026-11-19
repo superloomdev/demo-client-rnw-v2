@@ -487,7 +487,71 @@ describe('walker', function () {
         assert.ok(texts(renderer.toJSON()).some(function (line) {
           return line.indexOf('walk: done') === 0;
         }), profile + ': status');
+        assert.equal(globalThis.walkReport.unsettled.length, 0, profile + ': a settled walk names no cell');
       }
+    } finally {
+      await act(async function () {
+        renderer.unmount();
+      });
+    }
+  });
+
+  test('a cell that never stops moving is named in the report at the settle limit, not waited on forever', async function () {
+    const expected = Lib.Components.catalog.filter(function (entry) {
+      return entry.family === 'Icon';
+    }).reduce(function (sum, entry) {
+      return sum + entry.sample.filter(function (state) {
+        return state.cell !== false;
+      }).length;
+    }, 0);
+    const App = function () {
+      const { ThemeProvider } = Lib.ThemeContext;
+      return React.createElement(ThemeProvider, { profile: 'default' }, React.createElement(Walker, { family: 'Icon', settleLimitMs: 1500 }));
+    };
+    let renderer;
+    try {
+      globalThis.walkReport = undefined;
+      await act(async function () {
+        renderer = TestRenderer.create(React.createElement(LibProvider, { adapters: ADAPTERS }, React.createElement(App)));
+      });
+      await act(async function () {
+        renderer.root.findByProps({ testID: 'walk-grid' }).props.onLayout({ nativeEvent: { layout: { width: 400, height: 40 } } });
+      });
+      const bodies = renderer.root.findAll(function (node) {
+        return typeof node.props.testID === 'string' && node.props.testID.indexOf('body-') === 0 && typeof node.props.onLayout === 'function';
+      }).filter(function (node, index, all) {
+        return all.findIndex(function (other) {
+          return other.props.testID === node.props.testID;
+        }) === index;
+      });
+      assert.equal(bodies.length, expected);
+      await act(async function () {
+        for (const body of bodies) {
+          body.props.onLayout({ nativeEvent: { layout: { width: 20, height: 20 } } });
+        }
+      });
+
+      // One cell alternates its height every poll for longer than the limit
+      const moving = bodies[0];
+      for (let step = 1; step <= 25; step++) {
+        await act(async function () {
+          moving.props.onLayout({ nativeEvent: { layout: { width: 20, height: step % 2 === 1 ? 24 : 20 } } });
+          await new Promise(function (done) {
+            setTimeout(done, POLL_MS);
+          });
+        });
+        if (globalThis.walkReport !== undefined) {
+          break;
+        }
+      }
+
+      assert.equal(globalThis.walkReport !== undefined, true, 'the report is sent at the limit');
+      assert.equal(globalThis.walkReport.cells.length, expected);
+      assert.equal(globalThis.walkReport.unsettled.length, 1);
+      const named = globalThis.walkReport.unsettled[0];
+      assert.equal(named.component + '-' + named.state, moving.props.testID.slice('body-'.length));
+      assert.equal(named.changes >= 10, true, 'moves counted: ' + named.changes);
+      assert.deepEqual([named.from.join('x'), named.to.join('x')].sort(), ['20x20', '20x24']);
     } finally {
       await act(async function () {
         renderer.unmount();
@@ -686,6 +750,7 @@ describe('walk-assert', function () {
       gridWidth: 370,
       cellChrome: 26,
       cells: [{ component: 'Button', state: 'default', width: cell.width, height: cell.height }],
+      unsettled: [],
       fonts: [
         { role: 'font.family.mono', family: 'Mono', drawn: drawn.mono ? 'Mono' : 'System', loaded: drawn.mono },
         { role: 'font.family.sans', family: 'Sans', drawn: drawn.sans ? 'Sans' : 'System', loaded: drawn.sans }
@@ -732,6 +797,17 @@ describe('walk-assert', function () {
     assert.equal(run(fixture('ios', { width: 98, height: 20 }), WEB).status, 0);
     assert.equal(run(fixture('ios', { width: 102.5, height: 20 }), WEB).status, 1);
     assert.equal(run(fixture('ios', { width: 100, height: 22 }), WEB).status, 1);
+  });
+
+  test('a report sent at the settle limit fails, naming each cell that still moved', function () {
+    const native = fixture('ios', { width: 100, height: 20 });
+    native.unsettled = [{ component: 'Tile', state: 'expandable', changes: 37, from: [100, 20], to: [100, 24] }];
+    const result = run(native, WEB);
+    assert.equal(result.status, 1);
+    assert.match(result.out, /FAIL default: the layout settled .*"component":"Tile","state":"expandable","changes":37/);
+    const legacy = fixture('ios', { width: 100, height: 20 });
+    delete legacy.unsettled;
+    assert.equal(run(legacy, WEB).status, 1);
   });
 
   test('a face that was not drawn (a few points on a label) and a collapsed field both fail', function () {
@@ -796,7 +872,8 @@ describe('walker report', function () {
       cells: [{ component: 'Icon', state: 'default', width: 20, height: 20 }],
       errors: []
     });
-    assert.deepEqual(Object.keys(report).sort(), ['adaptive', 'brand', 'cellChrome', 'cells', 'components', 'diagnostics', 'dir', 'errors', 'expectedCells', 'family', 'fonts', 'form', 'gridWidth', 'platform', 'resolvedForm', 'schema', 'scheme', 'textScale', 'theme', 'tokens', 'widgets']);
+    assert.deepEqual(Object.keys(report).sort(), ['adaptive', 'brand', 'cellChrome', 'cells', 'components', 'diagnostics', 'dir', 'errors', 'expectedCells', 'family', 'fonts', 'form', 'gridWidth', 'platform', 'resolvedForm', 'schema', 'scheme', 'textScale', 'theme', 'tokens', 'unsettled', 'widgets']);
+    assert.equal(report.unsettled.length, 0);
     assert.equal(report.expectedCells, Lib.Components.catalog.reduce(function (sum, entry) {
       return sum + entry.sample.filter(function (state) {
         return state.cell !== false;

@@ -1,6 +1,7 @@
 // Info: Asserts walker reports for the native gate. For each template's
 // report on the platform: zero render errors, one measured cell per catalog
-// sample state, every cell larger than zero, and the sans and mono families
+// sample state, every cell larger than zero, no cell still moving at the
+// walker's settle limit, and the sans and mono families
 // the theme names actually drawn (the serif role is listed, not failed,
 // until the hosts carry it). With `--web <dir>`, the web report must have
 // drawn the same families (a baseline measured in a fallback face is no
@@ -88,6 +89,7 @@ for (const entry of CASES) {
     return !(cell.width > 0 && cell.height > 0);
   });
   check(empty.length === 0, theme + ': every cell has a size ' + JSON.stringify(empty));
+  check(Array.isArray(report.unsettled) && report.unsettled.length === 0, theme + ': the layout settled ' + JSON.stringify((report.unsettled || []).slice(0, 10)));
 
   // Fonts: sans and mono must be drawn as named; the others are reported
   check(report.fonts.length >= 1, theme + ': font roles reported');

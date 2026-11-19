@@ -21,6 +21,7 @@ Build the walker report.
 @param {Array}  input.errors    - [{ component, state, message }]
 @param {String} [input.family]  - The walked family, when one was requested
 @param {Number} [input.gridWidth] - The measured width of the cells grid
+@param {Array}  [input.unsettled] - [{ component, state, changes, from, to }] still moving at the settle limit
 
 @return {Object} - The report
 *********************************************************************/
@@ -77,6 +78,7 @@ export function buildReport (input) {
     errors: input.errors,
     fonts: fonts,
     gridWidth: input.gridWidth || 0,
+    unsettled: input.unsettled || [],
     cellChrome: CELL_CHROME,
     tokens: tokens
   };
