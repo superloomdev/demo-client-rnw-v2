@@ -66,13 +66,28 @@ describe('loader', function () {
     assert.deepEqual(Object.keys(Lib.Themes.profiles).sort(), ['carbon', 'default']);
     assert.equal(typeof Lib.Components.createSystem, 'function');
     assert.equal(typeof Lib.Components.factories.Icon, 'function');
-    assert.equal(Lib.Icons, undefined, 'icons are theme tokens, not a host adapter');
+    assert.equal(Lib.Icons === undefined, true, 'icons are theme tokens, not a host adapter');
   });
 
   test('a missing adapter slot throws, naming every gap', function () {
     assert.throws(function () {
       appLoader({});
     }, /missing or invalid adapter slots: Navigation, Fonts/);
+  });
+
+  test('the optional Widgets slot reaches Lib, and a malformed one throws', function () {
+    function stubPicker () {
+      return Promise.resolve(null);
+    }
+
+    const hosted = appLoader({ Navigation: navigationAdapter, Fonts: fontsAdapter, Widgets: function () {
+      return { FilePicker: stubPicker };
+    } }).Lib;
+    assert.equal(hosted.Widgets.FilePicker, stubPicker);
+    assert.deepEqual(appLoader({ Navigation: navigationAdapter, Fonts: fontsAdapter }).Lib.Widgets, {});
+    assert.throws(function () {
+      appLoader({ Navigation: navigationAdapter, Fonts: fontsAdapter, Widgets: {} });
+    }, /invalid optional adapter slots: Widgets/);
   });
 
   test('the theme is built for the native projection', function () {
@@ -309,6 +324,79 @@ describe('acme brand', function () {
 });
 
 
+/********************************************************************
+A color token value in the one form a computed style compares, or null
+for a value that is not a plain color.
+
+@param {*} value - A token value
+
+@return {String|null} - `r,g,b,a`, or null
+*********************************************************************/
+function getColorKey (value) {
+
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const hex = /^#([0-9a-f]{6})([0-9a-f]{2})?$/i.exec(value);
+  if (hex !== null) {
+    const alpha = hex[2] === undefined ? 1 : Math.round(parseInt(hex[2], 16) / 255 * 1000) / 1000;
+    return [0, 2, 4].map(function (start) {
+      return parseInt(hex[1].slice(start, start + 2), 16);
+    }).concat([alpha]).join(',');
+  }
+  const rgb = /^rgba?\(([^)]*)\)$/.exec(value.replace(/\s+/g, ''));
+  if (rgb !== null) {
+    const channels = rgb[1].split(',').map(Number);
+    return channels.slice(0, 3).concat([channels.length > 3 ? channels[3] : 1]).join(',');
+  }
+
+  return null;
+
+}
+
+
+describe('roles brand', function () {
+
+  // The brand test opens each profile at its first scheme; there, every
+  // color that shares the focus or interactive value must draw another
+  // under `roles`, or a part drawing it cannot be told from a focus leak
+  for (const profileName of ['default', 'carbon']) {
+    test(profileName + ' + roles: every color sharing the focus or interactive value draws its own', function () {
+      const profile = Lib.Themes.profiles[profileName];
+      const template = profile.schemes[Object.keys(profile.schemes)[0]];
+      const layer = Lib.Themes.brands.roles.light;
+      const own = Lib.Themer.buildTheme(template, [], THEME_PLATFORM).tokens;
+      const branded = Lib.Themer.buildTheme(template, [layer], THEME_PLATFORM).tokens;
+      const colors = Object.keys(own).filter(function (name) {
+        return name.indexOf('color.') === 0 && getColorKey(own[name]) !== null;
+      });
+      const shared = [getColorKey(own['color.focus']), getColorKey(own['color.interactive'])];
+      const missing = colors.filter(function (name) {
+        return shared.includes(getColorKey(own[name])) && getColorKey(branded[name]) === getColorKey(own[name]);
+      });
+      assert.deepEqual(missing, [], 'colors that still share the template focus or interactive value under roles');
+
+      // Each role color the brand adds is new to the scheme and to the
+      // brand: a coincident value would bring the ambiguity back
+      const added = Object.keys(layer.tokens).filter(function (name) {
+        return name !== 'color.focus' && name !== 'color.interactive';
+      });
+      const drawn = new Set(colors.map(function (name) {
+        return getColorKey(own[name]);
+      }));
+      assert.deepEqual(added.filter(function (name) {
+        return drawn.has(getColorKey(layer.tokens[name]));
+      }), [], 'role colors the unbranded scheme already draws');
+      const keys = added.map(function (name) {
+        return getColorKey(layer.tokens[name]);
+      }).concat([getColorKey(layer.tokens['color.focus'])]);
+      assert.equal(new Set(keys).size, keys.length, 'each role color is distinct from the others and from the focus color');
+    });
+  }
+
+});
+
+
 describe('walker', function () {
 
   /********************************************************************
@@ -391,15 +479,79 @@ describe('walker', function () {
             renderer.update(React.createElement(LibProvider, { adapters: ADAPTERS }, React.createElement(App, { profile: profile })));
           });
         }
-        globalThis.__walk = undefined;
+        globalThis.walkReport = undefined;
         assert.equal(await layOut(renderer), expected, profile + ': cells to lay out');
-        assert.ok(globalThis.__walk, profile + ': no report was built');
-        assert.equal(globalThis.__walk.theme, profile);
-        assert.equal(globalThis.__walk.cells.length, expected);
+        assert.ok(globalThis.walkReport, profile + ': no report was built');
+        assert.equal(globalThis.walkReport.theme, profile);
+        assert.equal(globalThis.walkReport.cells.length, expected);
         assert.ok(texts(renderer.toJSON()).some(function (line) {
           return line.indexOf('walk: done') === 0;
         }), profile + ': status');
+        assert.equal(globalThis.walkReport.unsettled.length, 0, profile + ': a settled walk names no cell');
       }
+    } finally {
+      await act(async function () {
+        renderer.unmount();
+      });
+    }
+  });
+
+  test('a cell that never stops moving is named in the report at the settle limit, not waited on forever', async function () {
+    const expected = Lib.Components.catalog.filter(function (entry) {
+      return entry.family === 'Icon';
+    }).reduce(function (sum, entry) {
+      return sum + entry.sample.filter(function (state) {
+        return state.cell !== false;
+      }).length;
+    }, 0);
+    const App = function () {
+      const { ThemeProvider } = Lib.ThemeContext;
+      return React.createElement(ThemeProvider, { profile: 'default' }, React.createElement(Walker, { family: 'Icon', settleLimitMs: 1500 }));
+    };
+    let renderer;
+    try {
+      globalThis.walkReport = undefined;
+      await act(async function () {
+        renderer = TestRenderer.create(React.createElement(LibProvider, { adapters: ADAPTERS }, React.createElement(App)));
+      });
+      await act(async function () {
+        renderer.root.findByProps({ testID: 'walk-grid' }).props.onLayout({ nativeEvent: { layout: { width: 400, height: 40 } } });
+      });
+      const bodies = renderer.root.findAll(function (node) {
+        return typeof node.props.testID === 'string' && node.props.testID.indexOf('body-') === 0 && typeof node.props.onLayout === 'function';
+      }).filter(function (node, index, all) {
+        return all.findIndex(function (other) {
+          return other.props.testID === node.props.testID;
+        }) === index;
+      });
+      assert.equal(bodies.length, expected);
+      await act(async function () {
+        for (const body of bodies) {
+          body.props.onLayout({ nativeEvent: { layout: { width: 20, height: 20 } } });
+        }
+      });
+
+      // One cell alternates its height every poll for longer than the limit
+      const moving = bodies[0];
+      for (let step = 1; step <= 25; step++) {
+        await act(async function () {
+          moving.props.onLayout({ nativeEvent: { layout: { width: 20, height: step % 2 === 1 ? 24 : 20 } } });
+          await new Promise(function (done) {
+            setTimeout(done, POLL_MS);
+          });
+        });
+        if (globalThis.walkReport !== undefined) {
+          break;
+        }
+      }
+
+      assert.equal(globalThis.walkReport !== undefined, true, 'the report is sent at the limit');
+      assert.equal(globalThis.walkReport.cells.length, expected);
+      assert.equal(globalThis.walkReport.unsettled.length, 1);
+      const named = globalThis.walkReport.unsettled[0];
+      assert.equal(named.component + '-' + named.state, moving.props.testID.slice('body-'.length));
+      assert.equal(named.changes >= 10, true, 'moves counted: ' + named.changes);
+      assert.deepEqual([named.from.join('x'), named.to.join('x')].sort(), ['20x20', '20x24']);
     } finally {
       await act(async function () {
         renderer.unmount();
@@ -598,6 +750,7 @@ describe('walk-assert', function () {
       gridWidth: 370,
       cellChrome: 26,
       cells: [{ component: 'Button', state: 'default', width: cell.width, height: cell.height }],
+      unsettled: [],
       fonts: [
         { role: 'font.family.mono', family: 'Mono', drawn: drawn.mono ? 'Mono' : 'System', loaded: drawn.mono },
         { role: 'font.family.sans', family: 'Sans', drawn: drawn.sans ? 'Sans' : 'System', loaded: drawn.sans }
@@ -644,6 +797,17 @@ describe('walk-assert', function () {
     assert.equal(run(fixture('ios', { width: 98, height: 20 }), WEB).status, 0);
     assert.equal(run(fixture('ios', { width: 102.5, height: 20 }), WEB).status, 1);
     assert.equal(run(fixture('ios', { width: 100, height: 22 }), WEB).status, 1);
+  });
+
+  test('a report sent at the settle limit fails, naming each cell that still moved', function () {
+    const native = fixture('ios', { width: 100, height: 20 });
+    native.unsettled = [{ component: 'Tile', state: 'expandable', changes: 37, from: [100, 20], to: [100, 24] }];
+    const result = run(native, WEB);
+    assert.equal(result.status, 1);
+    assert.match(result.out, /FAIL default: the layout settled .*"component":"Tile","state":"expandable","changes":37/);
+    const legacy = fixture('ios', { width: 100, height: 20 });
+    delete legacy.unsettled;
+    assert.equal(run(legacy, WEB).status, 1);
   });
 
   test('a face that was not drawn (a few points on a label) and a collapsed field both fail', function () {
@@ -708,7 +872,8 @@ describe('walker report', function () {
       cells: [{ component: 'Icon', state: 'default', width: 20, height: 20 }],
       errors: []
     });
-    assert.deepEqual(Object.keys(report).sort(), ['adaptive', 'brand', 'cellChrome', 'cells', 'components', 'diagnostics', 'dir', 'errors', 'expectedCells', 'family', 'fonts', 'form', 'gridWidth', 'platform', 'resolvedForm', 'schema', 'scheme', 'textScale', 'theme', 'tokens', 'widgets']);
+    assert.deepEqual(Object.keys(report).sort(), ['adaptive', 'brand', 'cellChrome', 'cells', 'components', 'diagnostics', 'dir', 'errors', 'expectedCells', 'family', 'fonts', 'form', 'gridWidth', 'platform', 'resolvedForm', 'schema', 'scheme', 'textScale', 'theme', 'tokens', 'unsettled', 'widgets']);
+    assert.equal(report.unsettled.length, 0);
     assert.equal(report.expectedCells, Lib.Components.catalog.reduce(function (sum, entry) {
       return sum + entry.sample.filter(function (state) {
         return state.cell !== false;

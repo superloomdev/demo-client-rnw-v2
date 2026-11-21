@@ -7,6 +7,10 @@
 // theme tokens drawn by the component library through react-native-svg.
 const REQUIRED_ADAPTERS = ['Navigation', 'Fonts'];
 
+// The slots a host may supply: `Widgets` answers the OS widgets the
+// component library seats (a native date picker, a file picker)
+const OPTIONAL_ADAPTERS = ['Widgets'];
+
 
 /////////////////////////// Public Functions START /////////////////////////////
 const Validators = {
@@ -41,10 +45,20 @@ const Validators = {
       throw new TypeError('loader: missing or invalid adapter slots: ' + missing.join(', '));
     }
 
+    // An optional slot, when present, is a factory function too
+    const malformed = OPTIONAL_ADAPTERS.filter(function (slot) {
+      return adapters[slot] !== undefined && typeof adapters[slot] !== 'function';
+    });
+
+    // Report them at once
+    if (malformed.length > 0) {
+      throw new TypeError('loader: invalid optional adapter slots: ' + malformed.join(', '));
+    }
+
   }
 
 
 };/////////////////////////// Public Functions END //////////////////////////////
 
 
-export { REQUIRED_ADAPTERS, Validators };
+export { REQUIRED_ADAPTERS, OPTIONAL_ADAPTERS, Validators };

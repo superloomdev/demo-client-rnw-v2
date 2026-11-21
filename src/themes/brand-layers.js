@@ -19,6 +19,20 @@ const ACME_TOKENS = {
   'icon.search': { icon: true, viewBox: '0 0 24 24', paths: [{ d: 'M10 3a7 7 0 015.6 11.2l5.2 5.2-1.4 1.4-5.2-5.2A7 7 0 1110 3zm0 2a5 5 0 100 10 5 5 0 000-10z' }] }
 };
 
+const ROLES_TOKENS = {
+  'color.interactive': ACME_TOKENS['color.interactive'],
+  'color.focus': ACME_TOKENS['color.focus'],
+  'color.button_primary': '#7b1fa2',
+  'color.button_tertiary': '#00796b',
+  'color.link_primary': '#6d4c41',
+  'color.border_interactive': '#ad1457',
+  'color.icon_interactive': '#827717',
+  'color.background_brand': '#283593',
+  'color.focus_inset': '#00838f',
+  'color.focus_inverse': '#9e9d24',
+  'color.highlight': '#4a148c'
+};
+
 export const BRAND_LAYERS = {
 
   // Acme: a sparse brand over any profile. One interactive color and its
@@ -30,6 +44,22 @@ export const BRAND_LAYERS = {
     name: 'acme',
     light: { tokens: ACME_TOKENS },
     dark: { tokens: ACME_TOKENS }
+  },
+
+  // Roles: acme's focus and interactive colors, and a color of its own for
+  // every other root color that shares their value in a scheme the brand
+  // test opens (carbon white: the primary and tertiary buttons, the primary
+  // link, the interactive border and icon, the brand background; default
+  // light: the inset and inverse focus, the highlight). Each of those colors
+  // is absent from every template, so under this brand a part that still
+  // draws the template's focus color is a leak, and a part that draws one of
+  // these draws its own role (a calendar day upstream draws the primary
+  // button color, `_flatpickr.scss:476-478`). `test-loader.js` proves the
+  // layer complete for each profile.
+  roles: {
+    name: 'roles',
+    light: { tokens: ROLES_TOKENS },
+    dark: { tokens: ROLES_TOKENS }
   }
 
 };

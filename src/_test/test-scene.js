@@ -257,7 +257,7 @@ describe('autopilot frame', function () {
         return node.props.testID === 'walker';
       })[0];
       assert.ok(walkerBefore && walkerAfter, 'the walker stays mounted');
-      assert.strictEqual(walkerBefore, walkerAfter, 'polling remounted the walker');
+      assert.strictEqual(walkerBefore === walkerAfter, true, 'polling remounted the walker');
       assert.ok(texts(renderer.toJSON()).some(function (line) {
         return line.indexOf('autopilot: carbon / Icon') === 0;
       }));

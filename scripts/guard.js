@@ -1,12 +1,19 @@
 // Info: Process containment for test, bundle, Playwright and fire children
 // (D43). A child that runs away on memory - five node processes were killed
-// by macOS Jetsam at ~375 GB resident in about 90 s - cannot be stopped by
-// a procedural rule, so the run itself gets a wrapper that watches the whole
+// by macOS Jetsam at ~375 GB in about 90 s - cannot be stopped by a
+// procedural rule, so the run itself gets a wrapper that watches the whole
 // process tree once a second and kills it first.
+//
+// What it counts is each process's footprint (resident plus compressed plus
+// swapped memory), never resident size alone: under pressure the system
+// compresses a runaway's pages as fast as they are allocated and resident
+// size stays small (`guard-memory.js`; 2026-11-17: 367 GB with 2.1 GB
+// resident passed a 3 GB resident ceiling). It also ends the run when the
+// operating system reports critical memory pressure (`killed pressure`).
 //
 // Usage: node scripts/guard.js [--seconds N] [--proc-mb N] [--tree-mb N] [--sample-ms N] -- <command> [args...]
 // Defaults: seconds 1800 (GUARD_SECONDS), proc-mb 6144 (GUARD_PROC_MB),
-// tree-mb 12288 (GUARD_TREE_MB). Kills exit 137 (memory) or 124 (time); the
+// tree-mb 12288 (GUARD_TREE_MB). Kills exit 137 (memory, pressure) or 124 (time); the
 // child's own exit code otherwise (1 on a signal). The child's stdio is
 // inherited, never captured: the guard holds no buffers. When `ps` is
 // unavailable the guard logs once and keeps running the child - containment
@@ -19,6 +26,8 @@ import { execFileSync, spawn } from 'node:child_process';
 import { appendFileSync, mkdirSync, writeSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { getFootprints, getMemoryVerdict, isPressureCritical, mergeMemory } from './guard-memory.js';
 
 const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url));
 const LOG_FILE = join(REPO_ROOT, '_test', 'test-results', 'guard.log');
@@ -103,7 +112,8 @@ Snapshot the process table and reduce it to the child's tree.
 @param {Number} rootPid - The child's pid
 
 @return {Object} - { order: pids deepest-first with the child last,
-  maxPid/maxRssMb: the largest resident process, treeMb: total }
+  maxPid/maxMemoryMb: the largest process by footprint, maxRssMb: that
+  process's resident size, treeMb: the tree's total footprint }
 *********************************************************************/
 function sampleTree (rootPid) {
 
@@ -138,19 +148,27 @@ function sampleTree (rootPid) {
   };
   walk(rootPid);
 
-  let maxPid = rootPid;
-  let maxRssMb = 0;
-  let treeRssKb = 0;
+  // Each process counts as the larger of its resident size and its
+  // footprint: compressed and swapped pages are memory too
+  const residentMb = new Map();
   for (const pid of order) {
-    const rss = rssKb.get(pid) || 0;
-    treeRssKb += rss;
-    if (rss > maxRssMb * 1024) {
-      maxRssMb = rss / 1024;
+    residentMb.set(pid, (rssKb.get(pid) || 0) / 1024);
+  }
+  const memoryMb = mergeMemory(residentMb, getFootprints(order));
+
+  let maxPid = rootPid;
+  let maxMemoryMb = 0;
+  let treeMemoryMb = 0;
+  for (const pid of order) {
+    const memory = memoryMb.get(pid) || 0;
+    treeMemoryMb += memory;
+    if (memory > maxMemoryMb) {
+      maxMemoryMb = memory;
       maxPid = pid;
     }
   }
 
-  return { order: order, maxPid: maxPid, maxRssMb: maxRssMb, treeMb: treeRssKb / 1024 };
+  return { order: order, maxPid: maxPid, maxMemoryMb: maxMemoryMb, maxRssMb: residentMb.get(maxPid) || 0, treeMb: treeMemoryMb };
 
 }
 
@@ -201,7 +219,7 @@ function signalTree (signal) {
 Report a kill and finish: one GUARD: line to stderr and the log file,
 then the documented exit code.
 
-@param {String} reason - 'memory' or 'time'
+@param {String} reason - 'memory', 'pressure' or 'time'
 @param {Object} sample - Last sampleTree result
 *********************************************************************/
 function terminate (reason, sample) {
@@ -211,6 +229,7 @@ function terminate (reason, sample) {
   killTree(sample.order);
   const line = 'GUARD: killed ' + reason +
     ' pid=' + sample.maxPid +
+    ' mem=' + Math.round(sample.maxMemoryMb) +
     ' rss=' + Math.round(sample.maxRssMb) +
     ' tree=' + Math.round(sample.treeMb) +
     ' after ' + Math.round((Date.now() - started) / 1000) + 's: ' +
@@ -218,11 +237,11 @@ function terminate (reason, sample) {
   writeSync(2, line + '\n');
   try {
     mkdirSync(join(REPO_ROOT, '_test', 'test-results'), { recursive: true });
-    appendFileSync(LOG_FILE, line + '\n');
+    appendFileSync(LOG_FILE, new Date().toISOString() + ' ' + line + '\n');
   } catch {
     // The log is best-effort; the kill already happened
   }
-  process.exit(reason === 'memory' ? 137 : 124);
+  process.exit(reason === 'time' ? 124 : 137);
 
 }
 
@@ -244,11 +263,10 @@ const timer = setInterval(function () {
   }
   lastOrder = sample.order;
 
-  // The per-process ceiling names the fattest descendant; the tree ceiling
-  // catches many small processes that are one runaway in aggregate
-  const memoryExceeded = sample.maxRssMb > procMb || sample.treeMb > treeMb;
-  if (memoryExceeded) {
-    terminate('memory', sample);
+  // A ceiling passed, or the system itself out of room, ends the run
+  const verdict = getMemoryVerdict(sample, { procMb: procMb, treeMb: treeMb }, isPressureCritical());
+  if (verdict !== null) {
+    terminate(verdict, sample);
     return;
   }
   if (Date.now() - started > seconds * 1000) {

@@ -4,7 +4,7 @@
 // one JSON report to `report` (a URL) by POST. The native gate reaches it by
 // deep link (nimbus://walk?theme=<t>&report=<url>) and screenshots it per
 // family (nimbus://walk/<Family>?theme=<t>). On web the report is also left
-// on `globalThis.__walk` for the e2e tests.
+// on `globalThis.walkReport` for the e2e tests.
 import { useLib } from '../../app-core/contexts/lib-context.js';
 import Scene from '../Scene.js';
 import createSafeCell from '../showcase/SafeCell.js';
@@ -21,6 +21,11 @@ export const POLL_MS = 100;
 // The longest a test waits for a report that needs no correction
 export const REPORT_AFTER_MS = 2 * SETTLE_MS + 3 * POLL_MS;
 
+// The longest a fully measured walk waits for quiet; past it the report is
+// sent naming the cells that still move, so a layout that never settles
+// fails the gate by name instead of timing out with nothing in hand
+export const SETTLE_LIMIT_MS = 60000;
+
 
 /********************************************************************
 Walker screen. A new theme selection or a new walk request (a deep link
@@ -30,6 +35,7 @@ its measurements and send status never carry over.
 @param {Object} props          - React props
 @param {String} [props.family] - Walk one family only
 @param {String} [props.report] - URL that receives the report by POST
+@param {Number} [props.settleLimitMs] - Overrides SETTLE_LIMIT_MS (the test host)
 
 @return {Object} - React element
 *********************************************************************/
@@ -43,7 +49,7 @@ export default function Walker (props) {
 
   // Render one run per selection and request, inside the route's own scene
   return React.createElement(Scene, { key: key, explorer: false },
-    React.createElement(WalkerRun, { family: props.family, report: props.report }));
+    React.createElement(WalkerRun, { family: props.family, report: props.report, settleLimitMs: props.settleLimitMs }));
 
 }
 
@@ -90,6 +96,8 @@ function WalkerRun (props) {
   const lastLayoutAt = React.useRef(0);
   const count = React.useRef(0);
   const markerAt = React.useRef(0);
+  const measuredAt = React.useRef(0);
+  const moves = React.useRef({});
   const statusRef = React.useRef('measuring');
   const [gridWidth, setGridWidth] = React.useState(0);
   const [shown, setShown] = React.useState({ measured: 0 });
@@ -121,7 +129,7 @@ function WalkerRun (props) {
     }
 
     let timer = null;
-    const send = function () {
+    const send = function (unsettled) {
 
       // Build the report from the measurements
       const report = buildReport({
@@ -131,9 +139,10 @@ function WalkerRun (props) {
         cells: Object.values(cells.current),
         errors: errors.current,
         family: props.family,
-        gridWidth: gridWidth
+        gridWidth: gridWidth,
+        unsettled: unsettled
       });
-      globalThis.__walk = report;
+      globalThis.walkReport = report;
 
       // Without a report URL the walk is done
       if (!props.report) {
@@ -163,6 +172,9 @@ function WalkerRun (props) {
       });
 
       // Quiet: every cell reported and nothing moved for SETTLE_MS
+      if (count.current >= expected && measuredAt.current === 0) {
+        measuredAt.current = Date.now();
+      }
       if (status === 'measuring') {
         if (count.current >= expected && Date.now() - lastLayoutAt.current >= SETTLE_MS) {
           markerAt.current = 0;
@@ -173,7 +185,19 @@ function WalkerRun (props) {
           return;
         }
       } else if (markerAt.current > 0 && Date.now() - Math.max(markerAt.current, lastLayoutAt.current) >= SETTLE_MS) {
-        send();
+        send([]);
+        return;
+      }
+
+      // Never quiet: past the limit the report names every cell that moved
+      // within the last few settle periods
+      if (measuredAt.current > 0 && Date.now() - measuredAt.current >= (props.settleLimitMs || SETTLE_LIMIT_MS)) {
+        const now = Date.now();
+        send(Object.values(moves.current).filter(function (move) {
+          return now - move.at < 4 * SETTLE_MS;
+        }).map(function (move) {
+          return { component: move.component, state: move.state, changes: move.changes, from: move.from, to: move.to };
+        }));
         return;
       }
 
@@ -232,6 +256,17 @@ function WalkerRun (props) {
             };
             if (previous === undefined) {
               count.current = count.current + 1;
+            }
+            if (previous !== undefined && (previous.width !== width || previous.height !== height)) {
+              const moved = moves.current[key];
+              moves.current[key] = {
+                component: entry.name,
+                state: state.label,
+                changes: moved === undefined ? 1 : moved.changes + 1,
+                at: Date.now(),
+                from: [previous.width, previous.height],
+                to: [width, height]
+              };
             }
             if (previous === undefined || previous.width !== width || previous.height !== height) {
               lastLayoutAt.current = Date.now();

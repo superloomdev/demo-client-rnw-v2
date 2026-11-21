@@ -34,6 +34,8 @@ adapter set. Called once per provider mount; the provider memoizes.
 @param {Object} adapters            - Host-supplied adapter factories
 @param {Object} adapters.Navigation - (Lib, config) => { Link, Redirect }
 @param {Object} adapters.Fonts      - (Lib, config) => { adapter, manifest }
+@param {Object} [adapters.Widgets]  - (Lib, config) => { DatePicker, FilePicker }:
+                                      the OS widgets the host carries
 
 @return {Object} result        - Runtime objects
 @return {Object} result.Lib    - Dependency container with all loaded modules
@@ -83,6 +85,9 @@ export default function loader (adapters) {
 
   // Navigation surface from the host
   Lib.Navigation = adapters.Navigation(Lib, {});
+
+  // The OS widgets the host carries, if any, for the component library
+  Lib.Widgets = adapters.Widgets === undefined ? {} : adapters.Widgets(Lib, {});
 
   // Theme data: one profile per template package. Each profile's brand set is
   // the template's own `brands` plus the demo's layers; a demo brand that

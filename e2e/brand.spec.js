@@ -8,10 +8,11 @@
 import { expect, test } from '@playwright/test';
 
 import { BRAND_LAYERS } from '../src/themes/brand-layers.js';
-import { focusBrandIssues } from './helpers/focus-brand.js';
+import { focusBrandIssues, focusRoleIssues } from './helpers/focus-brand.js';
 import { FAMILIES, PROFILES, openPage, waitForFamily } from './helpers/showcase.js';
 
 const ACME = BRAND_LAYERS.acme.light.tokens;
+const ROLES = BRAND_LAYERS.roles.light.tokens;
 
 // The sans family each profile names on its own; the brand replaces it
 const PROFILE_SANS = { default: 'IBM Plex Sans', carbon: 'IBM Plex Sans' };
@@ -54,7 +55,7 @@ async function getOwnFocusColors (page, profile, brand) {
   const errors = await openPage(page, '/walk/Icon?profile=' + profile + (brand ? '&brand=' + brand : ''));
   await expect(page.getByTestId('walk-status')).toContainText('walk: done');
   const tokens = await page.evaluate(function () {
-    return globalThis.__walk.tokens;
+    return globalThis.walkReport.tokens;
   });
   expect(errors).toEqual([]);
 
@@ -96,10 +97,13 @@ function getRingColors (shadow) {
 
 /********************************************************************
 The paint of every element in a focusable part's cell, read in the page.
+Each element keeps one paint id across reads, so a read after focus is
+compared element by element even when focus mounted new ones (a date
+picker's calendar opens on focus).
 
 @param {Object} node - The focusable element
 
-@return {Object} - { state, parts: [{ outlineStyle, outlineWidth, outlineColor, borderColor, borderWidth, shadow, fill }] }
+@return {Object} - { state, parts: [{ id, outlineStyle, outlineWidth, outlineColor, borderColor, borderWidth, shadow, fill }] }
 *********************************************************************/
 function getPaint (node) {
 
@@ -117,8 +121,13 @@ function getPaint (node) {
     component: cell.getAttribute('data-component'),
     surfaces: surfaces,
     parts: Array.from(cell.querySelectorAll('*')).map(function (candidate) {
+      if (candidate.dataset.paintId === undefined) {
+        globalThis.paintIdNext = (globalThis.paintIdNext || 0) + 1;
+        candidate.dataset.paintId = String(globalThis.paintIdNext);
+      }
       const style = window.getComputedStyle(candidate);
       return {
+        id: candidate.dataset.paintId,
         outlineStyle: style.outlineStyle,
         outlineWidth: style.outlineWidth,
         outlineColor: style.outlineColor,
@@ -149,11 +158,13 @@ async function getFocusDrawn (page, path, family) {
 
   const errors = await openPage(page, path);
   await waitForFamily(page, family);
-  const focusables = page.locator(FOCUSABLE);
-  const count = await focusables.count();
+  // The parts are fixed when the page opens: a locator resolved again per
+  // index would walk into content an earlier focus opened (a date
+  // picker's calendar days, whose focus upstream draws in the primary
+  // button color, `_flatpickr.scss:476-478`, not a focus role)
+  const focusables = await page.locator(FOCUSABLE).elementHandles();
   const out = [];
-  for (let i = 0; i < count; i++) {
-    const target = focusables.nth(i);
+  for (const target of focusables) {
     const before = await target.evaluate(getPaint);
     await target.focus();
     const after = await target.evaluate(getPaint);
@@ -161,12 +172,19 @@ async function getFocusDrawn (page, path, family) {
       node.blur();
     });
 
-    // Compare each element of the cell before and after focus
+    // Compare each element of the cell before and after focus; an element
+    // focus mounted (an opened calendar) is content, not the indicator
     const colors = [];
     let changed = false;
     let browserRing = false;
-    after.parts.forEach(function (now, index) {
-      const was = before.parts[index];
+    const previous = new Map(before.parts.map(function (part) {
+      return [part.id, part];
+    }));
+    after.parts.forEach(function (now) {
+      const was = previous.get(now.id);
+      if (was === undefined) {
+        return;
+      }
       const drawn = now.outlineStyle !== 'none' && parseFloat(now.outlineWidth) > 0;
       browserRing = browserRing || (drawn && now.outlineStyle === 'auto');
       if (drawn && (now.outlineStyle !== was.outlineStyle || now.outlineColor !== was.outlineColor || now.outlineWidth !== was.outlineWidth)) {
@@ -221,7 +239,7 @@ for (const profile of PROFILES) {
     const errors = await openPage(page, '/walk/Icon?profile=' + profile + '&brand=acme');
     await expect(page.getByTestId('walk-status')).toContainText('walk: done');
     const report = await page.evaluate(function () {
-      return globalThis.__walk;
+      return globalThis.walkReport;
     });
     expect(report.brand).toBe('acme');
     for (const name of ['color.interactive', 'color.focus', 'shape.radius_04', 'shape.radius_08']) {
@@ -243,12 +261,22 @@ for (const profile of PROFILES) {
 
     let own;
     let brandedPalette;
+    let rolesPalette;
     let brand;
 
     test.beforeAll(async function ({ browser }) {
       const page = await browser.newPage();
       own = await getOwnFocusColors(page, profile);
       brandedPalette = await getOwnFocusColors(page, profile, 'acme');
+      // Under `roles` every color that shares the template's focus value
+      // draws its own, so drawing one of those is a role, not a leak
+      rolesPalette = Object.assign(await getOwnFocusColors(page, profile, 'roles'), {
+        others: Object.keys(ROLES).filter(function (name) {
+          return name !== 'color.focus' && name !== 'color.interactive';
+        }).map(function (name) {
+          return toRgb(ROLES[name]);
+        })
+      });
       brand = [toRgb(ACME['color.focus']), toRgb(ACME['color.interactive'])];
       await page.close();
       expect(own.normal.filter(function (color) {
@@ -308,14 +336,22 @@ for (const profile of PROFILES) {
         // interactive color must become the brand's. Focus never draws the browser's own ring
         const unbranded = await getFocusDrawn(page, '/showcase/' + family + '?profile=' + profile, family);
         const branded = await getFocusDrawn(page, '/showcase/' + family + '?profile=' + profile + '&brand=acme', family);
+        const roled = await getFocusDrawn(page, '/showcase/' + family + '?profile=' + profile + '&brand=roles', family);
+        const states = unbranded.map(function (entry) {
+          return entry.state;
+        });
         expect(branded.map(function (entry) {
           return entry.state;
-        }), family + ': the same focusable parts with and without the brand').toEqual(unbranded.map(function (entry) {
+        }), family + ': the same focusable parts with and without the brand').toEqual(states);
+        expect(roled.map(function (entry) {
           return entry.state;
-        }));
+        }), family + ': the same focusable parts under roles').toEqual(states);
+        // A template focus color under `roles` is a leak; the role `roles`
+        // reads on a part is the one the brand must draw there
         branded.forEach(function (entry, index) {
           const label = family + ' / ' + entry.component + ' / ' + entry.state + ': ';
-          wrong.push.apply(wrong, focusBrandIssues(unbranded[index], entry, own, brandedPalette).map(issue => label + issue));
+          wrong.push.apply(wrong, focusBrandIssues(unbranded[index], roled[index], own, rolesPalette).map(issue => label + 'under roles: ' + issue));
+          wrong.push.apply(wrong, focusRoleIssues(entry, roled[index], brandedPalette, rolesPalette).map(issue => label + issue));
         });
         const brandedFocus = branded.filter(function (entry) {
           return entry.colors.some(function (color) {
@@ -350,7 +386,7 @@ for (const reach of [
     const errors = await openPage(page, '/walk/Icon?' + reach.query);
     await expect(page.getByTestId('walk-status')).toContainText('walk: done');
     const report = await page.evaluate(function () {
-      return globalThis.__walk;
+      return globalThis.walkReport;
     });
     expect(errors).toEqual([]);
     for (const name of Object.keys(reach.tokens)) {

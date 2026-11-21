@@ -68,11 +68,11 @@ function testIds (renderer) {
 
 describe('roster', function () {
 
-  test('getRoster yields 215 rows in roster order, 126 built, the nine planned last', function () {
+  test('getRoster yields 215 rows in roster order, 153 built, the nine planned last', function () {
     const groups = getRoster(Lib.Components.catalog);
     const totals = getTotals(groups);
     assert.equal(totals.total, 215);
-    assert.equal(totals.built, 126);
+    assert.equal(totals.built, 153);
     const allRows = groups.reduce(function (out, group) {
       return out.concat(group.rows);
     }, []);
@@ -101,7 +101,7 @@ describe('roster', function () {
       const renderer = await renderThemed(React.createElement(FamilyPage, { family: group.family }), { profile: 'carbon' });
       const ids = testIds(renderer);
       for (const row of pending) {
-        assert.equal(row.entry, null, row.name + ': a pending row carries no catalog entry');
+        assert.equal(row.entry === null, true, row.name + ': a pending row carries no catalog entry');
         assert.ok(ids.indexOf('todo-' + row.name) !== -1, group.family + ' / ' + row.name + ': no to-do card in ' + ids.slice(0, 8).join(','));
       }
       await act(async function () {

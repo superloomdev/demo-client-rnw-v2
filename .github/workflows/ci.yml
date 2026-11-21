@@ -82,6 +82,9 @@ jobs:
       - name: G6 - Every node script a workflow runs exists from its working directory
         run: |
           node scripts/check-workflow-paths.js
+      - name: G7 - No name starts with an underscore
+        run: |
+          node scripts/names-check.js
 
   lint:
     name: Lint

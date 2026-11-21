@@ -75,8 +75,10 @@ export function buildSystem (Lib, built, rederive, breakpoint, options) {
   }
 
   // Build the system through the library's one entry point. The platform
-  // seam passes the host's OS widgets as adapters; the config carries the
-  // host's text scale and the diagnostic sink the walker collects from.
+  // seam passes the host's OS widgets as adapters (the switch, and the
+  // date and file pickers the host's Widgets slot carries); the config
+  // carries the host's text scale and the diagnostic sink the walker
+  // collects from.
   const Registry = Lib.Components.createSystem({
     React: Lib.React,
     ReactNative: Lib.ReactNative,
@@ -84,7 +86,7 @@ export function buildSystem (Lib, built, rederive, breakpoint, options) {
     Utils: Lib.Utils,
     Debug: Lib.Debug,
     Themer: Lib.Themer,
-    adapters: { Switch: Lib.ReactNative.Switch }
+    adapters: Object.assign({ Switch: Lib.ReactNative.Switch }, Lib.Utils.isObject(Lib.Widgets) ? Lib.Widgets : {})
   }, {
     textScale: options && options.textScale,
     onDiagnostic: options && options.onDiagnostic
